@@ -1,0 +1,4 @@
+*.pt 
+wav2vec/
+timit/
+__pycache__/
