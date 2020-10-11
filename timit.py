@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 
 from scipy import signal
@@ -18,10 +19,11 @@ class TimitData:
 
     PHONES = VOWELS + STOPS + AFFRICATES + FRICATIVES + NASALS + SEMIVOWELS
 
-    def __init__(self, get_C_function, C_time_function, max_files=None, dropna=False):
+    def __init__(self, get_C_function, C_time_function, max_files=None, dropna=False, timit_dir='timit/TIMIT/train/'):
+        self.TIMIT_DIR = timit_dir
         C = {}
         phones_df = []
-        for filename in tqdm(TimitData.get_timit_files(n=max_files)):
+        for filename in tqdm(self.get_timit_files(n=max_files)):
             C[filename["wav"]] = get_C_function(filename["wav"])
             phones_df.append(TimitData.get_phone_timing(filename["phn"]))
         phones_df = pd.concat(phones_df)
@@ -30,15 +32,16 @@ class TimitData:
         phones_df["c"] = phones_df.apply(lambda x: C[x["wav"]][:, :, x["start_c"]:x["end_c"]].mean(axis=2), axis=1)
         if dropna:
             phones_df = phones_df.dropna()
+            phones_df = phones_df[phones_df["c"].apply(lambda x: not np.isnan(x).any())]
         self.phones_df = phones_df
 
         self.spectograms = {}
 
-    def get_timit_files(n=1):
+    def get_timit_files(self, n=1):
         '''Search the directory for all TIMIT files'''
 
         ret_list = []
-        for root, dirs, files in os.walk("./timit/timit"):
+        for root, dirs, files in os.walk(self.TIMIT_DIR):
             for f in filter(lambda x: x.endswith(".wav"), files):
                 f = os.path.join(root, f)
                 ret_list.append({"wav": f,
