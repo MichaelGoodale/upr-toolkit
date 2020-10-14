@@ -22,24 +22,33 @@ class TimitData:
 
     PHONES = VOWELS + STOPS + AFFRICATES + FRICATIVES + NASALS + SEMIVOWELS
 
-    def __init__(self, get_C_function, C_time_function, max_files=None, dropna=False, timit_dir='timit/TIMIT/train/'):
-        self.TIMIT_DIR = timit_dir
-        C = {}
-        phones_df = []
-        for filename in tqdm(self.get_timit_files(n=max_files)):
-            C[filename["wav"]] = get_C_function(filename["wav"])
-            phones = TimitData.get_phone_timing(filename["phn"])
-            phones = TimitData.get_formants(phones)
-            phones_df.append(phones)
-        phones_df = pd.concat(phones_df)
-        phones_df["start_c"] = phones_df["start"].apply(C_time_function)
-        phones_df["end_c"] = phones_df["end"].apply(C_time_function)
-        phones_df["c"] = phones_df.apply(lambda x: C[x["wav"]][:, :, x["start_c"]:x["end_c"]].mean(axis=2), axis=1)
-        if dropna:
-            phones_df = phones_df[phones_df["c"].apply(lambda x: not np.isnan(x).any())]
-        self.phones_df = phones_df
-
-        self.spectograms = {}
+    def __init__(self, get_C_function=None, C_time_function=None, max_files=None, dropna=False, timit_dir='timit/TIMIT/train/', load_file=None, save_file="timitdata.ft"):
+        if load_file is not None:
+            self.phones_df = pd.read_feather(load_file)
+            self.phones_df["c"] = np.load(load_file +".npy")
+        else:
+            if get_C_function is None or C_time_function is None:
+                raise Error("You must provide a function for get_C_function and C_time_function")
+            self.TIMIT_DIR = timit_dir
+            C = {}
+            phones_df = []
+            for filename in tqdm(self.get_timit_files(n=max_files)):
+                C[filename["wav"]] = get_C_function(filename["wav"])
+                phones = TimitData.get_phone_timing(filename["phn"])
+                phones = TimitData.get_formants(phones)
+                phones_df.append(phones)
+            phones_df = pd.concat(phones_df)
+            phones_df["start_c"] = phones_df["start"].apply(C_time_function)
+            phones_df["end_c"] = phones_df["end"].apply(C_time_function)
+            phones_df["c"] = phones_df.apply(lambda x: C[x["wav"]][:, :, x["start_c"]:x["end_c"]].mean(axis=2), axis=1)
+            if dropna:
+                phones_df = phones_df[phones_df["c"].apply(lambda x: not np.isnan(x).any())]
+                phones_df.reset_index(inplace=True)
+            self.phones_df = phones_df
+            if save_file is not None:
+                self.phones_df.loc[:, self.phones_df.columns !=  "c"].to_feather(save_file)
+                np.save(save_file + '.npy', self.phones_df["c"].values)
+            self.spectograms = {}
 
     def get_timit_files(self, n=1):
         '''Search the directory for all TIMIT files'''
