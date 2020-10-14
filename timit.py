@@ -6,6 +6,9 @@ from tqdm import tqdm
 from scipy import signal
 from scipy.io import wavfile
 
+import parselmouth
+from parselmouth.praat import call
+
 class TimitData:
     VOWELS = [ "iy",  "ih", "eh", "ey", "ae", "aa", "aw", "ay", "ah",
             "ao", "oy", "ow", "uh", "uw", "ux", "er", "ax", "ix", "ax-h"]
@@ -25,13 +28,14 @@ class TimitData:
         phones_df = []
         for filename in tqdm(self.get_timit_files(n=max_files)):
             C[filename["wav"]] = get_C_function(filename["wav"])
-            phones_df.append(TimitData.get_phone_timing(filename["phn"]))
+            phones = TimitData.get_phone_timing(filename["phn"])
+            phones = TimitData.get_formants(phones)
+            phones_df.append(phones)
         phones_df = pd.concat(phones_df)
         phones_df["start_c"] = phones_df["start"].apply(C_time_function)
         phones_df["end_c"] = phones_df["end"].apply(C_time_function)
         phones_df["c"] = phones_df.apply(lambda x: C[x["wav"]][:, :, x["start_c"]:x["end_c"]].mean(axis=2), axis=1)
         if dropna:
-            phones_df = phones_df.dropna()
             phones_df = phones_df[phones_df["c"].apply(lambda x: not np.isnan(x).any())]
         self.phones_df = phones_df
 
@@ -70,6 +74,19 @@ class TimitData:
             self.spectrograms['wav'] = (frequencies, times, spectrogram)
         return self.spectograms['wav']
 
+    def get_formant_time(start, end):
+        return ((0.33*(end - start)) + start) /  16000
+
+    def get_formants(phones):
+        wav_file = phones.loc[0, "wav"]
+        snd = parselmouth.Sound(wav_file)
+        formants = call(snd, "To Formant (burg)", 0.0025, 5, 5000, 0.025, 50)
+        for i in range(1, 5):
+            phones["f{}".format(i)] = phones.apply(lambda r: np.nan if r["phone"] not in TimitData.VOWELS
+                    else call(formants, "Get value at time", i,
+                              TimitData.get_formant_time(r['start'], r['end']), 'Hertz', 'Linear'),
+                    axis=1)
+        return phones
 
     def get_phone_timing(phones):
         '''Given a .PHN file, parse the phones in it and preprocess them to find basic phonological attributes
