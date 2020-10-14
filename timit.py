@@ -25,7 +25,8 @@ class TimitData:
     def __init__(self, get_C_function=None, C_time_function=None, max_files=None, dropna=False, timit_dir='timit/TIMIT/train/', load_file=None, save_file="timitdata.ft"):
         if load_file is not None:
             self.phones_df = pd.read_feather(load_file)
-            self.phones_df["c"] = np.load(load_file +".npy")
+            C = np.load(load_file + ".npy")
+            self.phones_df["c"] = [np.squeeze(c, axis=0) for c in np.split(C, C.shape[0], axis=0)]
         else:
             if get_C_function is None or C_time_function is None:
                 raise Error("You must provide a function for get_C_function and C_time_function")
@@ -47,7 +48,7 @@ class TimitData:
             self.phones_df = phones_df
             if save_file is not None:
                 self.phones_df.loc[:, self.phones_df.columns !=  "c"].to_feather(save_file)
-                np.save(save_file + '.npy', self.phones_df["c"].values)
+                np.save(save_file + '.npy', np.stack(self.phones_df["c"].values))
             self.spectograms = {}
 
     def get_timit_files(self, n=1):

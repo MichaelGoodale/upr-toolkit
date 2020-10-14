@@ -34,8 +34,6 @@ if not os.path.exists('timitdata.ft'):
 else:
     wav2vec_timit = TimitData(load_file='timitdata.ft')
 
-
-idx = wav2vec_timit.phones_df["phone"].isin(TimitData.VOWELS)
 X = np.vstack(wav2vec_timit.phones_df["c"][idx])
 y = wav2vec_timit.phones_df["phone"][idx]
 #from sklearn.svm import SVC
