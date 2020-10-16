@@ -1,4 +1,6 @@
 *.pt 
+*.ft
+*.npy
 wav2vec/
 timit/
 __pycache__/
