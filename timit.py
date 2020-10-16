@@ -85,7 +85,7 @@ class TimitData:
         return self.spectograms['wav']
 
     def get_formant_time(start, end):
-        return ((0.33*(end - start)) + start) /  16000
+        return ((0.5*(end - start)) + start) /  16000
 
     def get_formants(phones):
         wav_file = phones.loc[0, "wav"]
@@ -104,10 +104,15 @@ class TimitData:
 
         phone_times = []
         with open(phones) as f:
-            prev_phone = None
+            prev_phone = 'null'
             for l in f:
                 start, end, phone = l.strip().split(" ")
-                phone_times.append((int(start), int(end), phone, {}))
+                if prev_phone[-2:] == 'cl' and phone in TimitData.STOPS: 
+                    old_s, old_e, old_p, _ = phone_times[-1]
+                    phone_times[-1] = ((old_s, int(end), phone, {}))
+                else: 
+                    phone_times.append((int(start), int(end), phone, {}))
+                prev_phone = phone
 
         words_times = []
         with open(phones.replace('.phn', '.wrd')) as f:
