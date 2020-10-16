@@ -6,50 +6,23 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
-import torch
-import torchaudio
-from fairseq.models.wav2vec import Wav2VecModel
-
 from timit import TimitData
-
+from models import Wav2VecData
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
-def get_in_c_time(time):
-    ratio = 0.006196484134864083
-    return int(ratio*time)
 
-def calculate_C_wav2vec(filename):
-    wav_input_16khz, sr = torchaudio.load(filename)
-    if sr != 16000:
-        raise Exception("Sample rate is {}, please resample to be 16 kHz".format(sr / 1000))
-    z = model.feature_extractor(wav_input_16khz)
-    c = model.feature_aggregator(z).detach().numpy()
-    return c
 
-cp = torch.load('/home/michael/Documents/Cogmaster/M1/S1/stage/wav2vec_large.pt', map_location=torch.device('cpu'))
-model = Wav2VecModel.build_model(cp['args'], task=None)
-model.load_state_dict(cp['model'])
-model.eval()
+data = Wav2VecData()
 
-if not os.path.exists('timitdata.ft'):
-    wav2vec_timit = TimitData(calculate_C_wav2vec, get_in_c_time, dropna=True)
-else:
-    wav2vec_timit = TimitData(load_file='timitdata.ft')
-
-if not os.path.exists('timitdata_test.ft'):
-    wav2vec_timit_test = TimitData(calculate_C_wav2vec, get_in_c_time, dropna=True, timit_dir='timit/TIMIT/test/', save_file='timitdata_test.ft')
-else:
-    wav2vec_timit_test = TimitData(load_file='timitdata_test.ft')
-
-idx = wav2vec_timit.phones_df["phone"].isin(TimitData.VOWELS)
-phones = wav2vec_timit.phones_df[idx]
+idx = data.train.phones_df["phone"].isin(TimitData.VOWELS)
+phones = data.train.phones_df[idx]
 X = np.vstack(phones["c"])
 f1_y = phones["f1"]
 f2_y = phones["f2"]
 
-idx_test = wav2vec_timit_test.phones_df["phone"].isin(TimitData.VOWELS)
-phones_test = wav2vec_timit_test.phones_df[idx_test]
+idx_test = data.test.phones_df["phone"].isin(TimitData.VOWELS)
+phones_test = data.test.phones_df[idx_test]
 X_test = np.vstack(phones_test["c"])
 f1_y_test = phones_test["f1"]
 f2_y_test = phones_test["f2"]
@@ -92,7 +65,7 @@ print(reg2.score(X_test, f2_y_test))
 #plt.legend()
 #plt.show()
 
-phones = wav2vec_timit.phones_df.groupby("phone").filter(lambda x: len(x) > 1000).groupby("phone").sample(n=1000)
+phones = data.train.phones_df.groupby("phone").filter(lambda x: len(x) > 1000).groupby("phone").sample(n=1000)
 X = np.vstack(phones["c"])
 y = phones["phone"].sample(n=1000)
 #pca = PCA(n_components=50).fit_transform(X)
