@@ -31,11 +31,15 @@ class TimitData:
             if get_C_function is None or C_time_function is None:
                 raise Error("You must provide a function for get_C_function and C_time_function")
             self.TIMIT_DIR = timit_dir
+
+            lexical_info = TimitData.get_phone_data()
             C = {}
             phones_df = []
             for filename in tqdm(self.get_timit_files(n=max_files)):
                 C[filename["wav"]] = get_C_function(filename["wav"])
-                phones = TimitData.get_phone_timing(filename["phn"])
+
+                lex_file = filename['wav'].replace('.wav', '').replace(self.TIMIT_DIR, self.TIMIT_DIR.split('/')[-2]+'/')
+                phones = TimitData.get_phone_timing(filename["phn"], lexical_info[lexical_info['file'] == lex_file])
                 phones = TimitData.get_formants(phones)
                 phones_df.append(phones)
             phones_df = pd.concat(phones_df)
@@ -98,47 +102,38 @@ class TimitData:
                     axis=1)
         return phones
 
-    def get_phone_timing(phones):
+    def get_phone_timing(phones, df):
         '''Given a .PHN file, parse the phones in it and preprocess them to find basic phonological attributes
         Returns a pandas dataframe'''
-
         phone_times = []
         with open(phones) as f:
             prev_phone = 'null'
-            for l in f:
+            for l, (_, phone_row) in zip(f, df[~df['phone'].isin(['+', '-'])].iterrows()):
                 start, end, phone = l.strip().split(" ")
-                if prev_phone[-2:] == 'cl' and phone in TimitData.STOPS: 
-                    old_s, old_e, old_p, _ = phone_times[-1]
-                    phone_times[-1] = ((old_s, int(end), phone, {}))
+                if phone_row['phoneme'] == '+':
+                    phone_times[-1][1] = int(end)
+                    phone_times[-1][2] = phone_times[-1][2]+phone
                 else: 
-                    phone_times.append((int(start), int(end), phone, {}))
-                prev_phone = phone
-
-        words_times = []
-        with open(phones.replace('.phn', '.wrd')) as f:
-            for l in f:
-                start, end, word = l.strip().split(" ")
-                words_times.append((int(start), int(end), word))
-        for i, (start, end, phone, info) in enumerate(phone_times):
-            word = None
-            word_s = None
-            word_e = None
-            for s, e, w in words_times:
-                if start >= s and end <= e:
-                    word = w
-                    word_s = s
-                    word_e = e
-
-            info["word"] = word
-            info["wav"] = phones.replace(".phn", ".wav")
-            if word_s == start:
-                info["word_pos"] = "initial"
-            elif word_e == end:
-                info["word_pos"] = "final"
-            else:
-                info["word_pos"] = "medial"
-
-        columns = ["start", "end", "phone"]
-        df = pd.DataFrame(columns = columns +sorted(info.keys()))
-        df = df.append([{**{columns[i]:x[i] for i in range(3)},  **x[3]} for x in phone_times])
+                    phone_times.append([int(start), int(end), phone] + list(phone_row[["phoneme", "stress", "boundary", "word"]]))
+        df = pd.DataFrame(phone_times, columns=["start", "end", "phone", "phoneme", "stress", "boundary", "word"])
+        df["wav"] = phones.replace('.phn', '.wav')
         return df
+
+    def get_phone_data(word_align_file='timit/wrdalign.timit'):
+        datas = []
+        with open(word_align_file) as f:
+            for l in f:
+                if l[0] == '%':
+                    continue
+                elif l[0] == '#':
+                    curr_file = l.strip().replace('#', '')
+                else:
+                    data = l.strip().split('\t')
+                    if len(data) != 6:
+                        data.append('-')
+                    data.append(curr_file)
+                    datas.append(data)
+        df = pd.DataFrame(datas, columns=['phoneme', 'phone', 'distance', 'stress', 'boundary', 'word', 'file'])
+        df['word'] = df['word'].replace('-', method='ffill')
+        return df
+
