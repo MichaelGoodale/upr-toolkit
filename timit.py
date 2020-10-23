@@ -134,6 +134,14 @@ class TimitData:
                     data.append(curr_file)
                     datas.append(data)
         df = pd.DataFrame(datas, columns=['phoneme', 'phone', 'distance', 'stress', 'boundary', 'word', 'file'])
+
+        #Make sure every phone has its associated word listed, not just the first.
         df['word'] = df['word'].replace('-', method='ffill')
+
+
+        #Ensures that if the phone that is the boundary is deleted, we still have the boundary labeled 
+        #unless there is already a boundary there. 
+        df.loc[(df['phone'].shift(1).isin(['+', '-'])) & (df['boundary'] == '0'), "boundary"] = pd.NA
+        df['boundary'] = df['boundary'].fillna(method='ffill')
         return df
 
