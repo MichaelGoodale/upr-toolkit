@@ -6,3 +6,4 @@ wav2vec/
 CPC/
 timit/
 __pycache__/
+model_caches/
