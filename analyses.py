@@ -41,4 +41,14 @@ def display_reduction(train, category="phone", reducer=umap.UMAP(), min_sample=1
     plt.show()
 
 data = Wav2VecData()
-display_reduction(data.train)
+m = {**{x: 'vowel' for x in TimitData.VOWELS},
+     **{x: 'stop' for x in TimitData.STOPS},
+     **{x: 'fricative' for x in TimitData.FRICATIVES},
+     **{x: 'affricate' for x in TimitData.AFFRICATES},
+     **{x: 'nasal' for x in TimitData.AFFRICATES},
+     **{x: 'semivowel' for x in TimitData.SEMIVOWELS}}
+
+data.train.phones_df["consonant_type"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in m else 'non-phone')
+data.train.phones_df["vowel"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in TimitData.VOWELS or x in TimitData.SEMIVOWELS else 'consonant')
+data.train.phones_df["vowel"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in TimitData.VOWELS else 'consonant')
+display_reduction(data.train, category='boundary', min_sample=1000, display_sample=200)
