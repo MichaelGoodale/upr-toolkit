@@ -4,17 +4,49 @@ import torch
 import torchaudio
 from fairseq.models.wav2vec import Wav2VecModel
 
+from utils import PretrainedCPCModel
 from timit import TimitData
 
 TIMIT_DIR='timit/TIMIT'
 
-class Wav2VecData:
+class ModelData:
+    def get_in_c_time(self, time):
+        raise NotImplementedError("get_in_c_time must be defined in a subclass")
 
-    def get_in_c_time(time):
+    def calculate_c(self, filename):
+        raise NotImplementedError("calculate_c must be defined in a subclass")
+
+    def __init__(self, cache_file):
+        if not os.path.exists(cache_file):
+            timit = TimitData(self.calculate_c,
+                    self.get_in_c_time,
+                    timit_dir='{}/train/'.format(TIMIT_DIR),
+                    dropna=True,
+                    save_file=cache_file)
+        else:
+            timit = TimitData(load_file=cache_file)
+
+        test_file = cache_file.replace('.ft', '_test.ft')
+        if not os.path.exists(test_file):
+            timit_test = TimitData(self.calculate_c,
+                    self.get_in_c_time,
+                    timit_dir='{}/test/'.format(TIMIT_DIR),
+                    dropna=True,
+                    save_file=test_file)
+        else:
+            timit_test = TimitData(load_file=test_file)
+
+        self.train = timit
+        self.test = timit_test
+
+
+class Wav2VecData(ModelData):
+
+    def get_in_c_time(self, time):
         ratio = 0.006196484134864083
         return int(ratio*time)
 
-    def calculate_C_wav2vec(self, filename):
+    def calculate_c(self, filename):
         wav_input_16khz, sr = torchaudio.load(filename)
         if sr != 16000:
             raise Exception("Sample rate is {}, please resample to be 16 kHz".format(sr / 1000))
@@ -29,45 +61,25 @@ class Wav2VecData:
         self.model = Wav2VecModel.build_model(cp['args'], task=None)
         self.model.load_state_dict(cp['model'])
         self.model.eval()
+        super().__init__(cache_file)
 
-        if not os.path.exists(cache_file):
-            wav2vec_timit = TimitData(self.calculate_C_wav2vec,
-                    Wav2VecData.get_in_c_time,
-                    timit_dir='{}/train/'.format(TIMIT_DIR),
-                    dropna=True,
-                    save_file=cache_file)
-        else:
-            wav2vec_timit = TimitData(load_file=cache_file)
-        test_file = cache_file.replace('.ft', '_test.ft')
-        if not os.path.exists(test_file):
-            wav2vec_timit_test = TimitData(self.calculate_C_wav2vec,
-                    Wav2VecData.get_in_c_time,
-                    timit_dir='{}/test/'.format(TIMIT_DIR),
-                    dropna=True,
-                    save_file=test_file)
-        else:
-            wav2vec_timit_test = TimitData(load_file=test_file)
+class CPCData(ModelData):
 
-        self.test = wav2vec_timit_test
-        self.train = wav2vec_timit
+    def get_in_c_time(self, time):
+        ratio = 0.006196484134864083
+        return int(ratio*time)
 
-#from cpc.feature_loader import loadModel
-#
-#class PretrainedCPCModel(nn.Module):
-#    """ Class that handles CPC pretrained models
-#    https://github.com/facebookresearch/CPC_audio
-#    """
-#    def __init__(self, model_path, intermediate_idx=0):
-#        super().__init__()
-#        self.model = loadModel([model_path], intermediate_idx=intermediate_idx)[0]
-#        self.model.gAR.keepHidden = True
-#
-#    def forward(self, x):
-#        with torch.no_grad():
-#            x = x.view(1, 1, -1)
-#            encodedData = self.model.gEncoder(x).permute(0, 2, 1)
-#            cFeature = self.model.gAR(encodedData)
-#            encodedData = encodedData.permute(0, 2, 1)
-#            cFeature = cFeature.permute(0, 2, 1)
-#            return encodedData, cFeature, None
-#
+    def calculate_c(self, filename):
+        wav_input_16khz, sr = torchaudio.load(filename)
+        if sr != 16000:
+            raise Exception("Sample rate is {}, please resample to be 16 kHz".format(sr / 1000))
+        encodedData, cFeature, _ = model(wav_input_16khz)
+        return encodedData 
+
+    def __init__(self, cpc_model='/home/michael/Documents/Cogmaster/M1/S1/stage/CPC/michael_pretrained/english_model/checkpoint_60.pt',
+            cache_file='cpc_eng_data.ft'):
+
+        cp = torch.load(wav2vec_model, map_location=torch.device('cpu'))
+        self.model = PretrainedCPCModel(cpc_model)
+        self.model.eval()
+        super.__init__(cache_file)
