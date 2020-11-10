@@ -69,21 +69,20 @@ class Wav2VecData(ModelData):
 class CPCData(ModelData):
 
     def get_in_c_time(self, time):
-        ratio = 0.006196484134864083
+        ratio = 0.00623888282
         return int(ratio*time)
 
     def calculate_c(self, filename):
         wav_input_16khz, sr = torchaudio.load(filename)
         if sr != 16000:
             raise Exception("Sample rate is {}, please resample to be 16 kHz".format(sr / 1000))
-        encodedData, cFeature, _ = model(wav_input_16khz)
-        return encodedData 
+        _, cFeature, _ = self.model(wav_input_16khz)
+        return cFeature.detach().numpy()
 
     def __init__(self, cpc_model='/home/michael/Documents/Cogmaster/M1/S1/stage/CPC/michael_pretrained/english_model/checkpoint_60.pt',
             cache_file='cpc_eng_data.ft',
             max_files=None):
 
-        cp = torch.load(wav2vec_model, map_location=torch.device('cpu'))
-        self.model = PretrainedCPCModel(cpc_model)
+        self.model = PretrainedCPCModel(model_path=cpc_model)
         self.model.eval()
-        super.__init__(cache_file, max_files=max_files)
+        super().__init__(cache_file, max_files=max_files)

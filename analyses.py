@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from timit import TimitData
-from models import Wav2VecData
+from models import Wav2VecData, CPCData
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from sklearn import linear_model
@@ -40,7 +40,7 @@ def display_reduction(train, category="phone", reducer=umap.UMAP(), min_sample=1
     plt.legend()
     plt.show()
 
-data = Wav2VecData()
+data = CPCData(max_files=100)
 m = {**{x: 'vowel' for x in TimitData.VOWELS},
      **{x: 'stop' for x in TimitData.STOPS},
      **{x: 'fricative' for x in TimitData.FRICATIVES},
@@ -51,4 +51,5 @@ m = {**{x: 'vowel' for x in TimitData.VOWELS},
 data.train.phones_df["consonant_type"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in m else 'non-phone')
 data.train.phones_df["vowel"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in TimitData.VOWELS or x in TimitData.SEMIVOWELS else 'consonant')
 data.train.phones_df["vowel"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in TimitData.VOWELS else 'consonant')
-display_reduction(data.train, category='boundary', min_sample=1000, display_sample=200)
+
+display_reduction(data.train, category='vowel', min_sample=100, display_sample=100)

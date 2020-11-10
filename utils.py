@@ -1,7 +1,7 @@
-from torch import nn
+import torch
 from cpc.feature_loader import loadModel
 
-class PretrainedCPCModel(nn.Module):
+class PretrainedCPCModel(torch.nn.Module):
 
     """ Class that handles CPC pretrained models
     https://github.com/facebookresearch/CPC_audio
