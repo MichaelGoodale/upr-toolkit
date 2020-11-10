@@ -16,11 +16,12 @@ class ModelData:
     def calculate_c(self, filename):
         raise NotImplementedError("calculate_c must be defined in a subclass")
 
-    def __init__(self, cache_file):
+    def __init__(self, cache_file, max_files=None):
         if not os.path.exists(cache_file):
             timit = TimitData(self.calculate_c,
                     self.get_in_c_time,
                     timit_dir='{}/train/'.format(TIMIT_DIR),
+                    max_files=max_files,
                     dropna=True,
                     save_file=cache_file)
         else:
@@ -31,6 +32,7 @@ class ModelData:
             timit_test = TimitData(self.calculate_c,
                     self.get_in_c_time,
                     timit_dir='{}/test/'.format(TIMIT_DIR),
+                    max_files=max_files,
                     dropna=True,
                     save_file=test_file)
         else:
@@ -55,13 +57,14 @@ class Wav2VecData(ModelData):
         return c
 
     def __init__(self, wav2vec_model='/home/michael/Documents/Cogmaster/M1/S1/stage/wav2vec_large.pt',
-            cache_file='timitdata.ft'):
+            cache_file='timitdata.ft',
+            max_files=None):
 
         cp = torch.load(wav2vec_model, map_location=torch.device('cpu'))
         self.model = Wav2VecModel.build_model(cp['args'], task=None)
         self.model.load_state_dict(cp['model'])
         self.model.eval()
-        super().__init__(cache_file)
+        super().__init__(cache_file, max_files=max_files)
 
 class CPCData(ModelData):
 
@@ -77,9 +80,10 @@ class CPCData(ModelData):
         return encodedData 
 
     def __init__(self, cpc_model='/home/michael/Documents/Cogmaster/M1/S1/stage/CPC/michael_pretrained/english_model/checkpoint_60.pt',
-            cache_file='cpc_eng_data.ft'):
+            cache_file='cpc_eng_data.ft',
+            max_files=None):
 
         cp = torch.load(wav2vec_model, map_location=torch.device('cpu'))
         self.model = PretrainedCPCModel(cpc_model)
         self.model.eval()
-        super.__init__(cache_file)
+        super.__init__(cache_file, max_files=max_files)
