@@ -1,4 +1,5 @@
 import os
+from itertools import product
 import umap
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from timit import TimitData
-from models import Wav2VecData, CPCData
+from models import Wav2VecData, CPCData, VQWav2VecData
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from sklearn import linear_model
@@ -40,16 +41,26 @@ def display_reduction(train, category="phone", reducer=umap.UMAP(), min_sample=1
     plt.legend()
     plt.show()
 
-data = CPCData(max_files=100)
-m = {**{x: 'vowel' for x in TimitData.VOWELS},
-     **{x: 'stop' for x in TimitData.STOPS},
-     **{x: 'fricative' for x in TimitData.FRICATIVES},
-     **{x: 'affricate' for x in TimitData.AFFRICATES},
-     **{x: 'nasal' for x in TimitData.AFFRICATES},
-     **{x: 'semivowel' for x in TimitData.SEMIVOWELS}}
+def conditional_probability_matrix(train, vq_column=0, category="phone"):
+    units = np.round(np.vstack(train.phones_df["c"]))[:, vq_column].astype(int)
+    probability_of_unit = {unique: count/len(units) for unique, count in zip(*np.unique(units, return_counts=True))}
+    probability_of_phone_and_unit = {(unit, cat): 0 for unit, cat in product(probability_of_unit.keys(), train.phones_df[category].unique())}
+    for i, row in train.phones_df.iterrows():
+        cat = row[category]
+        unit = units[i]
+        probability_of_phone_and_unit[(unit, cat)] += 1
+    probability_of_phone_and_unit = {k: v/len(train.phones_df) for k, v in probability_of_phone_and_unit.items()}
+    probability_of_phone_given_unit = {(cat, unit): v/probability_of_unit[unit] for (unit, cat), v in probability_of_phone_and_unit.items()}
 
-data.train.phones_df["consonant_type"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in m else 'non-phone')
-data.train.phones_df["vowel"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in TimitData.VOWELS or x in TimitData.SEMIVOWELS else 'consonant')
-data.train.phones_df["vowel"] = data.train.phones_df["phone"].apply(lambda x: m[x] if x in TimitData.VOWELS else 'consonant')
+    cat_list = train.phones_df[category].value_counts()
+    cat_list = list(cat_list[cat_list > 25].index)
+    prob_mat = np.array([[probability_of_phone_given_unit[(cat, unit)] for unit in probability_of_unit.keys()] for cat in cat_list])
+    #Find the highest phone for each given unit, then sort so that we go from the highest prob for phone 0, phone 1, etc...
+    keys = [i for _, _, i in sorted([(a, prob_mat[a, i], i) for i, a in enumerate(np.argmax(prob_mat, 0))])]
+    prob_mat = np.clip(prob_mat, 0., 0.5) #Saturate colours @ 0.5
+    plt.matshow(prob_mat[:, keys])
+    plt.yticks(np.arange(len(cat_list)), cat_list)
+    plt.show()
 
-display_reduction(data.train, category='vowel', min_sample=100, display_sample=100)
+data = VQWav2VecData()
+conditional_probability_matrix(data.train, vq_column=0)
