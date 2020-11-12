@@ -66,7 +66,6 @@ class TimitData:
                     np.save(save_file + '.npy', np.stack(self.phones_df["c"].values, axis=0))
                 else:
                     np.save(save_file + '.npy', np.hstack(self.phones_df["c"].values))
-            self.spectograms = {}
 
     def get_timit_files(self, n=1):
         '''Search the directory for all TIMIT files'''
@@ -82,24 +81,6 @@ class TimitData:
                 if n is not None and n != 0 and len(ret_list) >= n:
                     return ret_list
         return ret_list
-
-    def get_spectrogram(wav):
-        '''Given a wave file, return its related spectogram.
-
-        To plot: 
-        >> times, frequencies, spectogram = get_spectrogram(wav)
-        >> plt.pcolormesh(times, frequencies, spectrogram)
-        >> plt.imshow(spectrogram)
-        >> plt.ylabel('Frequency [Hz]')
-        >> plt.xlabel('Time [sec]')
-        >> plt.show()
-        '''
-
-        if wav not in self.spectograms:
-            sample_rate, samples = wavfile.read('path-to-mono-audio-file.wav')
-            frequencies, times, spectrogram = signal.spectrogram(samples, sample_rate)
-            self.spectrograms['wav'] = (frequencies, times, spectrogram)
-        return self.spectograms['wav']
 
     def get_formant_time(start, end):
         return ((0.5*(end - start)) + start) /  16000

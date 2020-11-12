@@ -12,6 +12,7 @@ from models import Wav2VecData, CPCData, VQWav2VecData
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from sklearn import linear_model
+import torchaudio
 
 def get_formant_regression(train):
     idx = train.phones_df["phone"].isin(TimitData.VOWELS)
@@ -64,5 +65,31 @@ def conditional_probability_matrix(train, vq_column=0, category="phone"):
     plt.yticks(np.arange(len(cat_list)), cat_list)
     plt.show()
 
+def spectrogram_and_encodings(train, wav='timit/TIMIT/train/dr4/msrg0/sa1.wav'):
+    sentence = train.phones_df[train.phones_df["wav"] == wav]
+    signal, _ = torchaudio.load(wav)
+    fig, axs = plt.subplots(2)
+    signal = signal.numpy()[0]
+    axs[0].specgram(signal)
+
+    axs[1].plot(signal)
+    axs[1].set_xlim(0, len(signal))
+    bottom, top = axs[1].get_ylim()
+    c_pos = 0
+    for i, row in sentence.iterrows():
+        if i != 0: 
+            axs[1].axvline(x=row["start"], c="red")
+        axs[1].text( (row['end'] - row['start']) / 2 + row['start'],
+                top - 0.005,
+                row["phone"],
+                verticalalignment="top",
+                horizontalalignment="center")
+        c = row["c"]
+        c_offset = (row['end']-row['start'])/c.shape[-1]
+        for unit in c.T:
+            axs[1].text(c_pos, bottom + 0.005, unit, rotation="vertical", fontsize='x-small')
+            c_pos += c_offset
+
+    plt.show()
 data = VQWav2VecData()
-conditional_probability_matrix(data.train, vq_column=1)
+spectrogram_and_encodings(data.train)
