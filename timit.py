@@ -29,7 +29,7 @@ class TimitData:
             if take_mean:
                 self.phones_df["c"] = [np.squeeze(c, axis=0) for c in np.split(C, C.shape[0], axis=0)]
             else:
-                self.phones_df["c"] = [c for c in np.split(C, self.phones_df["c_lengths"].cumsum()[:-1], axis=0)]
+                self.phones_df["c"] = [c for c in np.split(C, self.phones_df["c_lengths"].cumsum()[:-1], axis=-1)]
         else:
             if get_C_function is None or C_time_function is None:
                 raise Error("You must provide a function for get_C_function and C_time_function")
@@ -52,7 +52,7 @@ class TimitData:
             if take_mean:
                 phones_df["c"] = phones_df.apply(lambda x: C[x["wav"]][:, :, x["start_c"]:x["end_c"]].mean(axis=2), axis=1)
             else:
-                phones_df["c"] = phones_df.apply(lambda x: C[x["wav"]][:, :, x["start_c"]:x["end_c"]], axis=1)
+                phones_df["c"] = phones_df.apply(lambda x: np.squeeze(C[x["wav"]][:, :, x["start_c"]:x["end_c"]], axis=0), axis=1)
                 phones_df["c_lengths"] = phones_df["c"].apply(lambda x: x.shape[-1])
 
             if dropna:
@@ -65,7 +65,7 @@ class TimitData:
                 if take_mean:
                     np.save(save_file + '.npy', np.stack(self.phones_df["c"].values, axis=0))
                 else:
-                    np.save(save_file + '.npy', np.dstack(self.phones_df["c"].values))
+                    np.save(save_file + '.npy', np.hstack(self.phones_df["c"].values))
             self.spectograms = {}
 
     def get_timit_files(self, n=1):
