@@ -16,16 +16,18 @@ class ModelData:
     def calculate_c(self, filename):
         raise NotImplementedError("calculate_c must be defined in a subclass")
 
-    def __init__(self, cache_file, max_files=None):
+    def __init__(self, cache_file, max_files=None, take_mean=True):
         if not os.path.exists(cache_file):
             timit = TimitData(self.calculate_c,
                     self.get_in_c_time,
                     timit_dir='{}/train/'.format(TIMIT_DIR),
                     max_files=max_files,
+                    take_mean=take_mean,
                     dropna=True,
                     save_file=cache_file)
         else:
-            timit = TimitData(load_file=cache_file)
+            timit = TimitData(load_file=cache_file,
+                    take_mean=take_mean)
 
         test_file = cache_file.replace('.ft', '_test.ft')
         if not os.path.exists(test_file):
@@ -33,10 +35,12 @@ class ModelData:
                     self.get_in_c_time,
                     timit_dir='{}/test/'.format(TIMIT_DIR),
                     max_files=max_files,
+                    take_mean=take_mean,
                     dropna=True,
                     save_file=test_file)
         else:
-            timit_test = TimitData(load_file=test_file)
+            timit_test = TimitData(load_file=test_file,
+                    take_mean=take_mean)
 
         self.train = timit
         self.test = timit_test
@@ -65,6 +69,30 @@ class Wav2VecData(ModelData):
         self.model.load_state_dict(cp['model'])
         self.model.eval()
         super().__init__(cache_file, max_files=max_files)
+
+class VQWav2VecData(ModelData):
+    def get_in_c_time(self, time):
+        ratio = 0.006196484134864083
+        return int(ratio*time)
+
+    def calculate_c(self, filename):
+        wav_input_16khz, sr = torchaudio.load(filename)
+        if sr != 16000:
+            raise Exception("Sample rate is {}, please resample to be 16 kHz".format(sr / 1000))
+        z = self.model.feature_extractor(wav_input_16khz)
+        _, idxs = self.model.vector_quantizer.forward_idx(z)
+        idxs = idxs.detach().numpy().swapaxes(1,2)
+        return idxs
+
+    def __init__(self, wav2vec_model='/home/michael/Documents/Cogmaster/M1/S1/stage/vq-wav2vec.pt',
+            cache_file='model_caches/vq_wav2vec.ft',
+            max_files=None):
+
+        cp = torch.load(wav2vec_model, map_location=torch.device('cpu'))
+        self.model = Wav2VecModel.build_model(cp['args'], task=None)
+        self.model.load_state_dict(cp['model'])
+        self.model.eval()
+        super().__init__(cache_file, max_files=max_files, take_mean=False)
 
 class CPCData(ModelData):
 
