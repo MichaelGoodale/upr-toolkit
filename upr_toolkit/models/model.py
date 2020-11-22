@@ -7,7 +7,7 @@ from fairseq.models.wav2vec import Wav2VecModel
 from upr_toolkit.timit import TimitData
 
 
-TIMIT_DIR='/home/michael/Documents/Cogmaster/M1/S1/stage/timit'
+TIMIT_DIR='/home/michael/Documents/Cogmaster/M1/S1/stage/timit/TIMIT'
 
 class ModelData:
     def get_in_c_time(self, time):
