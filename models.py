@@ -16,18 +16,16 @@ class ModelData:
     def calculate_c(self, filename):
         raise NotImplementedError("calculate_c must be defined in a subclass")
 
-    def __init__(self, cache_file, max_files=None, take_mean=True):
+    def __init__(self, cache_file, max_files=None):
         if not os.path.exists(cache_file):
             timit = TimitData(self.calculate_c,
                     self.get_in_c_time,
                     timit_dir='{}/train/'.format(TIMIT_DIR),
                     max_files=max_files,
-                    take_mean=take_mean,
                     dropna=True,
                     save_file=cache_file)
         else:
-            timit = TimitData(load_file=cache_file,
-                    take_mean=take_mean)
+            timit = TimitData(load_file=cache_file)
 
         test_file = cache_file.replace('.ft', '_test.ft')
         if not os.path.exists(test_file):
@@ -35,12 +33,10 @@ class ModelData:
                     self.get_in_c_time,
                     timit_dir='{}/test/'.format(TIMIT_DIR),
                     max_files=max_files,
-                    take_mean=take_mean,
                     dropna=True,
                     save_file=test_file)
         else:
-            timit_test = TimitData(load_file=test_file,
-                    take_mean=take_mean)
+            timit_test = TimitData(load_file=test_file)
 
         self.train = timit
         self.test = timit_test
@@ -92,7 +88,7 @@ class VQWav2VecData(ModelData):
         self.model = Wav2VecModel.build_model(cp['args'], task=None)
         self.model.load_state_dict(cp['model'])
         self.model.eval()
-        super().__init__(cache_file, max_files=max_files, take_mean=False)
+        super().__init__(cache_file, max_files=max_files)
 
 class CPCData(ModelData):
 

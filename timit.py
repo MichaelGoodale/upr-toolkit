@@ -22,14 +22,11 @@ class TimitData:
 
     PHONES = VOWELS + STOPS + AFFRICATES + FRICATIVES + NASALS + SEMIVOWELS
 
-    def __init__(self, get_C_function=None, C_time_function=None, max_files=None, dropna=False, timit_dir='timit/TIMIT/train/', load_file=None, save_file="timitdata.ft", take_mean=True):
+    def __init__(self, get_C_function=None, C_time_function=None, max_files=None, dropna=False, timit_dir='timit/TIMIT/train/', load_file=None, save_file="timitdata.ft"):
         if load_file is not None:
             self.phones_df = pd.read_feather(load_file)
             C = np.load(load_file + ".npy")
-            if take_mean:
-                self.phones_df["c"] = [np.squeeze(c, axis=0) for c in np.split(C, C.shape[0], axis=0)]
-            else:
-                self.phones_df["c"] = [c for c in np.split(C, self.phones_df["c_lengths"].cumsum()[:-1], axis=-1)]
+            self.phones_df["c"] = [c for c in np.split(C, self.phones_df["c_lengths"].cumsum()[:-1], axis=-1)]
         else:
             if get_C_function is None or C_time_function is None:
                 raise Error("You must provide a function for get_C_function and C_time_function")
@@ -49,11 +46,8 @@ class TimitData:
             phones_df["start_c"] = phones_df["start"].apply(C_time_function)
             phones_df["end_c"] = phones_df["end"].apply(C_time_function)
 
-            if take_mean:
-                phones_df["c"] = phones_df.apply(lambda x: C[x["wav"]][:, :, x["start_c"]:x["end_c"]].mean(axis=2), axis=1)
-            else:
-                phones_df["c"] = phones_df.apply(lambda x: np.squeeze(C[x["wav"]][:, :, x["start_c"]:x["end_c"]], axis=0), axis=1)
-                phones_df["c_lengths"] = phones_df["c"].apply(lambda x: x.shape[-1])
+            phones_df["c"] = phones_df.apply(lambda x: np.squeeze(C[x["wav"]][:, :, x["start_c"]:x["end_c"]], axis=0), axis=1)
+            phones_df["c_lengths"] = phones_df["c"].apply(lambda x: x.shape[-1])
 
             if dropna:
                 phones_df = phones_df[phones_df["c"].apply(lambda x: not np.isnan(x).any())]
@@ -62,10 +56,7 @@ class TimitData:
             self.phones_df = phones_df
             if save_file is not None:
                 self.phones_df.loc[:, self.phones_df.columns !=  "c"].to_feather(save_file)
-                if take_mean:
-                    np.save(save_file + '.npy', np.stack(self.phones_df["c"].values, axis=0))
-                else:
-                    np.save(save_file + '.npy', np.hstack(self.phones_df["c"].values))
+                np.save(save_file + '.npy', np.hstack(self.phones_df["c"].values))
 
     def get_timit_files(self, n=1):
         '''Search the directory for all TIMIT files'''

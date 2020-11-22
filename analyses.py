@@ -17,7 +17,7 @@ import torchaudio
 def get_formant_regression(train):
     idx = train.phones_df["phone"].isin(TimitData.VOWELS)
     phones = train.phones_df[idx]
-    X = np.vstack(phones["c"])
+    X = np.vstack([np.mean(x, axis=2) for x in df["c"]])
     f1_y = phones["f1"]
     f2_y = phones["f2"]
     reg1 = linear_model.LinearRegression()
@@ -28,7 +28,7 @@ def get_formant_regression(train):
 
 def display_reduction(train, category="phone", reducer=umap.UMAP(), min_sample=1000, display_sample=50):
     df = train.phones_df.groupby(category).filter(lambda x: len(x) > min_sample).groupby(category).sample(n=min_sample)
-    X = np.vstack(df["c"])
+    X = np.vstack([np.mean(x, axis=2) for x in df["c"]])
     y = df.groupby(category).sample(n=display_sample)[category]
     reducer = reducer.fit(X)
     embedding = reducer.transform(np.vstack(df["c"][y.index]))
@@ -70,6 +70,7 @@ def spectrogram_and_encodings(train, wav='timit/TIMIT/train/dr4/msrg0/sa1.wav'):
     signal, _ = torchaudio.load(wav)
     fig, axs = plt.subplots(2)
     signal = signal.numpy()[0]
+    signal = signal[:int(0.25*len(signal))]
     axs[0].specgram(signal)
 
     axs[1].plot(signal)
@@ -91,5 +92,6 @@ def spectrogram_and_encodings(train, wav='timit/TIMIT/train/dr4/msrg0/sa1.wav'):
             c_pos += c_offset
 
     plt.show()
+
 data = VQWav2VecData()
-spectrogram_and_encodings(data.train)
+conditional_probability_matrix(data.train, vq_column=1)
