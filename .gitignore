@@ -2,6 +2,7 @@
 *.ft
 *.npy
 *.npz
+env/
 wav2vec/
 CPC/
 timit/

@@ -104,7 +104,7 @@ class TimitData:
         df["wav"] = phones.replace('.phn', '.wav')
         return df
 
-    def get_phone_data(word_align_file='timit/wrdalign.timit'):
+    def get_phone_data(word_align_file='/home/michael/Documents/Cogmaster/M1/S1/stage/timit/wrdalign.timit'):
         datas = []
         with open(word_align_file) as f:
             for l in f:

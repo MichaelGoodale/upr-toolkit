@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from timit import TimitData
-from models import Wav2VecData
+from models import Wav2VecData, CPCData
 import networkx as nx
 
 def generate_tree(sentence_df):
@@ -41,16 +41,16 @@ def generate_tree(sentence_df):
     consecutive_words = [(sentence_df['word'] != sentence_df["word"].shift()).cumsum()]
     multi_syllabic_words = sentence_df.loc[nuclei, :].groupby(consecutive_words).filter(lambda x: len(x) > 1).groupby('word')
     noncentres = []
-    #for word, group in multi_syllabic_words:
-    #    centre = group[group["stress"] == "1"].index
-    #    if len(centre) == 0:
-    #        centre = [group[group["stress"] == "0"].first_valid_index()]
-    #    for x in list(group.index.difference(centre)):
-    #        G.add_edge(centre[0], x)
-    #        noncentres.append(x)
+    for word, group in multi_syllabic_words:
+        centre = group[group["stress"] == "1"].index
+        if len(centre) == 0:
+            centre = [group[group["stress"] == "0"].first_valid_index()]
+        for x in list(group.index.difference(centre)):
+            G.add_edge(centre[0], x)
+            noncentres.append(x)
 
-    ##for nucleus in filter(lambda x: x not in noncentres, nuclei):
-    #    G.add_edge(sentence_df.first_valid_index(), nucleus)
+    for nucleus in filter(lambda x: x not in noncentres, nuclei):
+        G.add_edge(sentence_df.first_valid_index(), nucleus)
     paths = dict(nx.all_pairs_shortest_path_length(G))
     return G, paths
 
@@ -64,7 +64,7 @@ def get_path_matrix(paths):
 
 def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max):
     distance_matrix = np.zeros((n_sentences, sentence_max, sentence_max))
-    C_matrix = np.zeros((n_sentences, sentence_max, 512))
+    C_matrix = np.zeros((n_sentences, sentence_max, 256))
     len_matrix = []
     for i, (wav, sentence) in tqdm(enumerate(phones_df.groupby('wav')), total=n_sentences):
         _, paths = generate_tree(sentence)
@@ -73,7 +73,7 @@ def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max):
         len_matrix.append(len(sentence))
     return distance_matrix, C_matrix, np.array(len_matrix)
 
-data = Wav2VecData()
+data = CPCData()
 N_SENTENCES = data.train.phones_df['wav'].nunique()
 SENTENCE_MAX = data.train.phones_df.value_counts('wav').max()
 distance_matrix, C_matrix, lengths = generate_distance_and_c_matrix(data.train.phones_df, N_SENTENCES, SENTENCE_MAX)
@@ -84,15 +84,15 @@ import torch
 dtype = torch.float
 device = torch.device("cpu")
 
-#C_tensor = torch.from_numpy(C_matrix).type(torch.float)
-#distance_tensor = torch.from_numpy(distance_matrix).type(torch.float)
-#lengths = torch.from_numpy(lengths).type(torch.float)
+C_tensor = torch.from_numpy(C_matrix).type(torch.float)
+distance_tensor = torch.from_numpy(distance_matrix).type(torch.float)
+lengths = torch.from_numpy(lengths).type(torch.float)
 
-B = torch.rand((512, 32), dtype=torch.float, requires_grad=True)
+B = torch.rand((256, 256), dtype=torch.float, requires_grad=True)
 N_EPOCHS = 40
 BATCH_SIZE = 128 
 optimizer = torch.optim.Adam([B], lr=0.1)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.95)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.9)
 
 def forward(C_batch):
     tree_space = torch.matmul(C_batch, B)
@@ -120,7 +120,6 @@ for epoch in range(N_EPOCHS):
     scheduler.step()
     print(loss.item())
 
-
 N_SENTENCES = data.test.phones_df['wav'].nunique()
 SENTENCE_MAX = data.test.phones_df.value_counts('wav').max()
 distance_matrix, C_matrix, lengths = generate_distance_and_c_matrix(data.test.phones_df, N_SENTENCES, SENTENCE_MAX)
@@ -128,12 +127,8 @@ lengths = torch.from_numpy(lengths)
 C_tensor = torch.from_numpy(C_matrix).type(torch.float)
 distance_tensor = torch.from_numpy(distance_matrix).type(torch.float)
 tree_space = forward(C_tensor)
-
-B = torch.load("B.pt")
+tree_space = torch.round(tree_space)
 labels_1s = (distance_tensor != -1).float()
-matching = ((labels_1s*distance_tensor).view(-1) == (torch.round((labels_1s*tree_space).view(-1))//114))[distance_tensor.view(-1) > 0]
+matching = ((labels_1s*distance_tensor).view(-1) == ((labels_1s*tree_space).view(-1)))
 print(torch.sum(matching)/float(len(matching)))
-output = torch.round(labels_1s*tree_space) // 114
-print(output.shape, distance_tensor.shape)
-print(labels_1s*output[0, :, :], labels_1s*distance_tensor[0, :, :])
 torch.save(B, "B.pt")

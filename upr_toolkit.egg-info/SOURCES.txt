@@ -1,0 +1,15 @@
+README.md
+setup.py
+upr_toolkit/__init__.py
+upr_toolkit/analyses.py
+upr_toolkit/timit.py
+upr_toolkit/tree.py
+upr_toolkit.egg-info/PKG-INFO
+upr_toolkit.egg-info/SOURCES.txt
+upr_toolkit.egg-info/dependency_links.txt
+upr_toolkit.egg-info/top_level.txt
+upr_toolkit/models/CPCData.py
+upr_toolkit/models/VQWav2VecData.py
+upr_toolkit/models/Wav2VecData.py
+upr_toolkit/models/__init__.py
+upr_toolkit/models/model.py
