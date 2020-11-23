@@ -93,5 +93,5 @@ def spectrogram_and_encodings(train, wav='timit/TIMIT/train/dr4/msrg0/sa1.wav'):
 
     plt.show()
 
-data = VQWav2VecData()
+data = CPCData()
 conditional_probability_matrix(data.train, vq_column=1)

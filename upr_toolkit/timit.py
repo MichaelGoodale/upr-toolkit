@@ -9,6 +9,8 @@ from scipy.io import wavfile
 import parselmouth
 from parselmouth.praat import call
 
+import multiprocessing
+
 class TimitData:
     VOWELS = [ "iy",  "ih", "eh", "ey", "ae", "aa", "aw", "ay", "ah",
             "ao", "oy", "ow", "uh", "uw", "ux", "er", "ax", "ix", "ax-h"]
@@ -22,7 +24,10 @@ class TimitData:
 
     PHONES = VOWELS + STOPS + AFFRICATES + FRICATIVES + NASALS + SEMIVOWELS
 
-    def __init__(self, get_C_function=None, C_time_function=None, max_files=None, dropna=False, timit_dir='timit/TIMIT/train/', load_file=None, save_file="timitdata.ft"):
+    def __init__(self, get_C_function=None, C_time_function=None, max_files=None, dropna=False,
+            timit_dir='timit/TIMIT/train/', load_file=None, save_file="timitdata.ft",
+            n_proc=multiprocessing.cpu_count(), multi_proc_c=False,
+            calculate_formants=True):
         if load_file is not None:
             self.phones_df = pd.read_feather(load_file)
             C = np.load(load_file + ".npy")
@@ -33,15 +38,26 @@ class TimitData:
             self.TIMIT_DIR = timit_dir
 
             lexical_info = TimitData.get_phone_data()
-            C = {}
-            phones_df = []
-            for filename in tqdm(self.get_timit_files(n=max_files)):
-                C[filename["wav"]] = get_C_function(filename["wav"])
+            timit_files = self.get_timit_files(n=max_files)
 
-                lex_file = filename['wav'].replace('.wav', '').replace(self.TIMIT_DIR, self.TIMIT_DIR.split('/')[-2]+'/')
-                phones = TimitData.get_phone_timing(filename["phn"], lexical_info[lexical_info['file'] == lex_file])
-                phones = TimitData.get_formants(phones)
-                phones_df.append(phones)
+            pool = multiprocessing.Pool(processes=n_proc)
+
+            if multi_proc_c:
+                C = list(tqdm(pool.imap(get_C_function, [f["wav"] for f in timit_files]), total=len(timit_files)))
+                C = {f["wav"]: v for f, v in zip(timit_files, C)}
+            else:
+                C = {}
+                for f in tqdm(timit_files):
+                    C[f["wav"]] = get_C_function(f["wav"])
+
+            load_phone_args = [(f['phn'], lexical_info[lexical_info['file'] == self.get_lex_file(f)])
+                for f in timit_files]
+
+            phones_df = pool.starmap(TimitData.get_phone_timing, load_phone_args)
+            if calculate_formants:
+                phones_df = list(tqdm(pool.imap(TimitData.get_formants, phones_df), total=len(timit_files)))
+            pool.close()
+
             phones_df = pd.concat(phones_df)
             phones_df["start_c"] = phones_df["start"].apply(C_time_function)
             phones_df["end_c"] = phones_df["end"].apply(C_time_function)
@@ -57,6 +73,9 @@ class TimitData:
             if save_file is not None:
                 self.phones_df.loc[:, self.phones_df.columns !=  "c"].to_feather(save_file)
                 np.save(save_file + '.npy', np.hstack(self.phones_df["c"].values))
+
+    def get_lex_file(self, filename):
+        return filename['wav'].replace('.wav', '').replace(self.TIMIT_DIR, self.TIMIT_DIR.split('/')[-2]+'/')
 
     def get_timit_files(self, n=1):
         '''Search the directory for all TIMIT files'''

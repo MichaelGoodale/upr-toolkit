@@ -16,25 +16,31 @@ class ModelData:
     def calculate_c(self, filename):
         raise NotImplementedError("calculate_c must be defined in a subclass")
 
-    def __init__(self, cache_file, max_files=None):
-        if not os.path.exists(cache_file):
+    def __init__(self, cache_file, max_files=None, **kwargs):
+        if cache_file is None or not os.path.exists(cache_file):
             timit = TimitData(self.calculate_c,
                     self.get_in_c_time,
                     timit_dir='{}/train/'.format(TIMIT_DIR),
                     max_files=max_files,
                     dropna=True,
-                    save_file=cache_file)
+                    save_file=cache_file,
+                    **kwargs)
         else:
             timit = TimitData(load_file=cache_file)
 
-        test_file = cache_file.replace('.ft', '_test.ft')
-        if not os.path.exists(test_file):
+        if cache_file is not None:
+            test_file = cache_file.replace('.ft', '_test.ft')
+        else:
+            test_file = None
+
+        if cache_file is None or not os.path.exists(test_file):
             timit_test = TimitData(self.calculate_c,
                     self.get_in_c_time,
                     timit_dir='{}/test/'.format(TIMIT_DIR),
                     max_files=max_files,
                     dropna=True,
-                    save_file=test_file)
+                    save_file=test_file, 
+                    **kwargs)
         else:
             timit_test = TimitData(load_file=test_file)
 
