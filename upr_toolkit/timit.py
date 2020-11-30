@@ -152,7 +152,10 @@ class TimitData:
     def __init__(self, get_C_function=None, C_time_function=None, max_files=None, dropna=False,
             timit_dir='timit/TIMIT/train/', load_file=None, save_file="timitdata.ft",
             n_proc=multiprocessing.cpu_count(), multi_proc_c=False,
+            word_align_file='/home/michael/Documents/Cogmaster/M1/S1/stage/timit/wrdalign.timit',
             calculate_formants=True):
+
+        self.word_align_file = word_align_file
         if load_file is not None:
             self.phones_df = pd.read_feather(load_file)
             C = np.load(load_file + ".npy")
@@ -251,9 +254,9 @@ class TimitData:
         df["wav"] = phones.replace('.phn', '.wav')
         return df
 
-    def get_phone_data(word_align_file='/home/michael/Documents/Cogmaster/M1/S1/stage/timit/wrdalign.timit'):
+    def get_phone_data():
         datas = []
-        with open(word_align_file) as f:
+        with open(self.word_align_file) as f:
             for l in f:
                 if l[0] == '%':
                     continue
