@@ -12,7 +12,7 @@ class RandomData(ModelData):
         number_of_samples = int(result.stdout)
         return np.random.uniform(size=(1, self.d, self.get_in_c_time(number_of_samples) + 1))
 
-    def __init__(self, d=256, seed=1337, max_files=None):
+    def __init__(self, d=256, seed=1337, max_files=None, **kwargs):
         self.d = d
         np.random.seed(seed)
-        super().__init__(None, max_files=max_files, multi_proc_c=True, calculate_formants=False)
+        super().__init__(None, max_files=max_files, multi_proc_c=True, calculate_formants=False, **kwargs)

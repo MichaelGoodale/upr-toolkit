@@ -41,8 +41,8 @@ class CPCData(ModelData):
 
     def __init__(self, cpc_model='/home/michael/Documents/Cogmaster/M1/S1/stage/CPC/michael_pretrained/english_model/checkpoint_60.pt',
             cache_file='/home/michael/Documents/Cogmaster/M1/S1/stage/model_caches/cpc_eng_data.ft',
-            max_files=None):
+            max_files=None, **kwargs):
 
         self.model = PretrainedCPCModel(model_path=cpc_model)
         self.model.eval()
-        super().__init__(cache_file, max_files=max_files)
+        super().__init__(cache_file, max_files=max_files, **kwargs)

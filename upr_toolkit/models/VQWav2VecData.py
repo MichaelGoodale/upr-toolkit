@@ -20,10 +20,10 @@ class VQWav2VecData(ModelData):
 
     def __init__(self, wav2vec_model='/home/michael/Documents/Cogmaster/M1/S1/stage/vq-wav2vec.pt',
             cache_file='/home/michael/Documents/Cogmaster/M1/S1/stage/model_caches/vq_wav2vec.ft',
-            max_files=None):
+            max_files=None, **kwargs):
 
         cp = torch.load(wav2vec_model, map_location=torch.device('cpu'))
         self.model = Wav2VecModel.build_model(cp['args'], task=None)
         self.model.load_state_dict(cp['model'])
         self.model.eval()
-        super().__init__(cache_file, max_files=max_files)
+        super().__init__(cache_file, max_files=max_files, **kwargs)
