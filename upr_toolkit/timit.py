@@ -31,7 +31,7 @@ class TimitData:
             'aedcl':'æd̚',
             'ah': 'ʌ',
             'ahr': 'ʌɹ',
-            'ahw', 'ʌw',
+            'ahw': 'ʌw',
             'ao': 'ɔ',
             'aor': 'ɔ˞',
             'aw': 'aʊ',
