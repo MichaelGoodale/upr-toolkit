@@ -10,7 +10,7 @@ class RandomData(ModelData):
     def calculate_c(self, filename):
         result = subprocess.run(['soxi', '-s', filename], capture_output=True)
         number_of_samples = int(result.stdout)
-        return np.random.uniform(size=(1, self.d, self.get_in_c_time(number_of_samples)))
+        return np.random.uniform(size=(1, self.d, self.get_in_c_time(number_of_samples) + 1))
 
     def __init__(self, d=256, seed=1337, max_files=None):
         self.d = d
