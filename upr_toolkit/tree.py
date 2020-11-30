@@ -1,7 +1,7 @@
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import numpy as np
 import networkx as nx
+import torch
 from torch import nn
 
 from upr_toolkit.timit import TimitData
@@ -49,26 +49,27 @@ def generate_tree(sentence_df, do_syllables=True, include_nucleus=False, do_word
     paths = dict(nx.all_pairs_shortest_path_length(G))
     return G, paths
 
-def get_path_matrix(paths, sentence_max):
-    mat = -1*np.ones((sentence_max, sentence_max))
+def get_path_tensor(paths, sentence_max):
+    mat = -1*torch.ones((sentence_max, sentence_max))
     offset = min([i for i in paths])
     for i in paths:
         for j in paths[i]:
             mat[i-offset, j-offset] = paths[i][j]
     return mat
 
-def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, feature_dim=256, functions=[(np.mean, {"axis":1})]):
-    distance_matrix = np.zeros((n_sentences, sentence_max, sentence_max))
-    C_matrix = np.zeros((n_sentences, sentence_max, feature_dim))
-    len_matrix = []
+def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, feature_dim=256, functions=[(torch.mean, {"dim":1})]):
+    distance_tensor = torch.zeros((n_sentences, sentence_max, sentence_max))
+    C_tensor = torch.zeros((n_sentences, sentence_max, feature_dim))
+    len_tensor = []
     for i, (wav, sentence) in tqdm(enumerate(phones_df.groupby('wav')), total=n_sentences):
         _, paths = generate_tree(sentence)
-        distance_matrix[i, :, :] = get_path_matrix(paths, sentence_max)
-        values = np.hstack([np.vstack([f(x, **kwargs) for x in sentence["c"].values])
+        distance_tensor[i, :, :] = get_path_tensor(paths, sentence_max)
+        c_values = [torch.from_numpy(x) for x in sentence["c"].values]
+        values = torch.hstack([torch.vstack([f(x, **kwargs) for x in c_values])
                             for f, kwargs in functions])
-        C_matrix[i, :len(sentence), :] = values
-        len_matrix.append(len(sentence))
-    return distance_matrix, C_matrix, np.array(len_matrix)
+        C_tensor[i, :len(sentence), :] = values
+        len_tensor.append(len(sentence))
+    return C_tensor, distance_tensor, torch.tensor(len_tensor)
 
 
 def tree_loss(output, true_output, sentence_lengths):
