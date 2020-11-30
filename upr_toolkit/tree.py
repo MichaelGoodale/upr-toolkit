@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 from torch import nn
 
-from timit import TimitData
-from models import Wav2VecData, CPCData, RandomData, Wav2Vec2Data
+from upr_toolkit.timit import TimitData
+from upr_toolkit.models import Wav2VecData, CPCData, RandomData, Wav2Vec2Data
 import networkx as nx
 
 def generate_tree(sentence_df):
