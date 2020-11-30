@@ -88,7 +88,7 @@ class TreeProbe(nn.Module):
     def __init__(self, n_dim=256, B_size=128, sentence_max=66):
         super(TreeProbe, self).__init__()
         self.sentence_max = sentence_max
-        self.B = nn.Linear(n_dim, B_size, requires_grad=True)
+        self.B = nn.Linear(n_dim, B_size)
 
     def forward(self, x):
         tree_space = self.B(C_batch)
