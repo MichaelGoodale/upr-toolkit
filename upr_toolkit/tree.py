@@ -1,17 +1,12 @@
-import os
-import umap
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-import pandas as pd
+import networkx as nx
 from torch import nn
 
 from upr_toolkit.timit import TimitData
-from upr_toolkit.models import Wav2VecData, CPCData, RandomData, Wav2Vec2Data
-import networkx as nx
 
-def generate_tree(sentence_df):
+def generate_tree(sentence_df, do_syllables=True, include_nucleus=False, do_words=True):
     G = nx.Graph()
 
     syllable_groups = []
@@ -36,22 +31,18 @@ def generate_tree(sentence_df):
             nucleus = y.index[0]
             nuclei.append(nucleus)
             for phone in syllable_group:
-                if phone == nucleus:
+                if not include_nucleus and phone == nucleus:
                     continue
-                G.add_edge(nucleus, phone)
-    consecutive_words = [(sentence_df['word'] != sentence_df["word"].shift()).cumsum()]
-    multi_syllabic_words = sentence_df.loc[nuclei, :].groupby(consecutive_words).filter(lambda x: len(x) > 1).groupby('word')
-    noncentres = []
-    for word, group in multi_syllabic_words:
-        centre = group[group["stress"] == "1"].index
-        if len(centre) == 0:
-            centre = [group[group["stress"] == "0"].first_valid_index()]
-        for x in list(group.index.difference(centre)):
-            G.add_edge(centre[0], x)
-            noncentres.append(x)
+                if do_syllables:
+                    G.add_edge(nucleus, phone)
 
-    for nucleus in filter(lambda x: x not in noncentres, nuclei):
-        G.add_edge(sentence_df.first_valid_index(), nucleus)
+    if do_words:
+        consecutive_words = [(sentence_df['word'] != sentence_df["word"].shift()).cumsum()]
+        multi_syllabic_words = sentence_df.loc[nuclei, :].groupby(consecutive_words).filter(lambda x: len(x) > 1).groupby('word')
+        for word, group in multi_syllabic_words:
+            for x in group.index:
+                    G.add_edge(centre[0], x)
+
     paths = dict(nx.all_pairs_shortest_path_length(G))
     return G, paths
 
