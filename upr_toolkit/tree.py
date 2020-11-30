@@ -49,8 +49,8 @@ def generate_tree(sentence_df, do_syllables=True, include_nucleus=False, do_word
     paths = dict(nx.all_pairs_shortest_path_length(G))
     return G, paths
 
-def get_path_matrix(paths):
-    mat = -1*np.ones((SENTENCE_MAX, SENTENCE_MAX))
+def get_path_matrix(paths, sentence_max):
+    mat = -1*np.ones((sentence_max, sentence_max))
     offset = min([i for i in paths])
     for i in paths:
         for j in paths[i]:
@@ -63,7 +63,7 @@ def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max):
     len_matrix = []
     for i, (wav, sentence) in tqdm(enumerate(phones_df.groupby('wav')), total=n_sentences):
         _, paths = generate_tree(sentence)
-        distance_matrix[i, :, :] = get_path_matrix(paths)
+        distance_matrix[i, :, :] = get_path_matrix(paths, sentence_max)
         values = np.hstack([np.vstack([np.mean(x, axis=1) for x in sentence["c"].values]),
                             np.vstack([np.var(x, axis=1) for x in sentence["c"].values]),
                             np.vstack([np.median(x, axis=1) for x in sentence["c"].values]),
@@ -93,5 +93,5 @@ class TreeProbe(nn.Module):
 
     def forward(self, x):
         tree_space = self.B(C_batch)
-        tree_space = tree_space.unsqueeze(2).expand(-1, -1, SENTENCE_MAX, -1)
+        tree_space = tree_space.unsqueeze(2).expand(-1, -1, self.sentence_max, -1)
         return torch.sum((tree_space - tree_space.transpose(1, 2)).pow(2), -1)
