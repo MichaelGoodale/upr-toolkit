@@ -38,12 +38,12 @@ class TimitData:
             'aww': 'aʊw',
             'ax': 'ə',
             'ax-h': 'ə̥',
-            'axr': 'ɚ'
+            'axr': 'ɚ',
             'axrr': 'ɚɹ',
             'axw':'əw',
             'ay': 'aɪ',
             'ayy': 'aɪj', 
-            'b': 'b'
+            'b': 'b',
             'bcl':'b̚',
             'bclb': 'bʰ',
             'ch': 'ʃ',
@@ -101,7 +101,7 @@ class TimitData:
             'kclt': 'k̺',
             'l': 'l',
             'm': 'm',
-            'n': 'n'
+            'n': 'n',
             'nd': 'nd̚',
             'ng': 'ŋ',
             'nggcl': 'ng̚',
@@ -125,7 +125,7 @@ class TimitData:
             's': 's',
             'sh': 'ʃ',
             'shy': 'ʃj',
-            'stcl': 'ʃt'
+            'stcl': 'ʃt',
             't': 't',
             'tcl': 't̚',
             'tclch': 'ʧ',
@@ -277,3 +277,12 @@ class TimitData:
         df['boundary'] = df['boundary'].fillna(method='ffill')
         return df
 
+    @property
+    def get_number_of_sentences():
+        return self.phones_df['wav'].nunique()
+
+    @property
+    def get_largest_sentence():
+        return self.phones_df.value_counts('wav').max()
+
+    

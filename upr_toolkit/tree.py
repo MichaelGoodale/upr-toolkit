@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import pandas as pd
+from torch import nn
 
 from timit import TimitData
-from models import Wav2VecData, CPCData
+from models import Wav2VecData, CPCData, RandomData, Wav2Vec2Data
 import networkx as nx
 
 def generate_tree(sentence_df):
@@ -35,8 +36,8 @@ def generate_tree(sentence_df):
             nucleus = y.index[0]
             nuclei.append(nucleus)
             for phone in syllable_group:
-                #if phone == nucleus:
-                #    continue
+                if phone == nucleus:
+                    continue
                 G.add_edge(nucleus, phone)
     consecutive_words = [(sentence_df['word'] != sentence_df["word"].shift()).cumsum()]
     multi_syllabic_words = sentence_df.loc[nuclei, :].groupby(consecutive_words).filter(lambda x: len(x) > 1).groupby('word')
@@ -64,71 +65,39 @@ def get_path_matrix(paths):
 
 def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max):
     distance_matrix = np.zeros((n_sentences, sentence_max, sentence_max))
-    C_matrix = np.zeros((n_sentences, sentence_max, 256))
+    C_matrix = np.zeros((n_sentences, sentence_max, 304))
     len_matrix = []
     for i, (wav, sentence) in tqdm(enumerate(phones_df.groupby('wav')), total=n_sentences):
         _, paths = generate_tree(sentence)
         distance_matrix[i, :, :] = get_path_matrix(paths)
-        C_matrix[i, :len(sentence), :] = np.concatenate(sentence["c"].values) 
+        values = np.hstack([np.vstack([np.mean(x, axis=1) for x in sentence["c"].values]),
+                            np.vstack([np.var(x, axis=1) for x in sentence["c"].values]),
+                            np.vstack([np.median(x, axis=1) for x in sentence["c"].values]),
+                            np.vstack([x.shape[1] for x in sentence["c"].values])])
+        C_matrix[i, :len(sentence), :] = values
         len_matrix.append(len(sentence))
     return distance_matrix, C_matrix, np.array(len_matrix)
 
-data = CPCData()
-N_SENTENCES = data.train.phones_df['wav'].nunique()
-SENTENCE_MAX = data.train.phones_df.value_counts('wav').max()
-distance_matrix, C_matrix, lengths = generate_distance_and_c_matrix(data.train.phones_df, N_SENTENCES, SENTENCE_MAX)
 
-
-import torch
-
-dtype = torch.float
-device = torch.device("cpu")
-
-C_tensor = torch.from_numpy(C_matrix).type(torch.float)
-distance_tensor = torch.from_numpy(distance_matrix).type(torch.float)
-lengths = torch.from_numpy(lengths).type(torch.float)
-
-B = torch.rand((256, 256), dtype=torch.float, requires_grad=True)
-N_EPOCHS = 40
-BATCH_SIZE = 128 
-optimizer = torch.optim.Adam([B], lr=0.1)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.9)
-
-def forward(C_batch):
-    tree_space = torch.matmul(C_batch, B)
-    tree_space = tree_space.unsqueeze(2).expand(-1, -1, SENTENCE_MAX, -1)
-    diffs = torch.sum((tree_space - tree_space.transpose(1, 2)).pow(2), -1)
-    return diffs
-
-def loss_function(tree_space, distance_batch, sentence_lengths):
-    labels_1s = (distance_batch != -1).float()
-    loss = torch.sum(torch.abs(tree_space*labels_1s - distance_batch*labels_1s), dim=[1,2]) / sentence_lengths
+def tree_loss(output, true_output, sentence_lengths):
+    labels_1s = (true_output != -1).float()
+    loss = torch.sum(torch.abs(output*labels_1s - true_output*labels_1s), dim=[1,2]) / sentence_lengths
     loss = torch.sum(loss) / torch.tensor(len(sentence_lengths))
     return loss
 
-for epoch in range(N_EPOCHS):
-    for i in range(N_SENTENCES // BATCH_SIZE):
-        optimizer.zero_grad()
-        min_idx = i*BATCH_SIZE
-        max_idx = min_idx + BATCH_SIZE
-        C_batch = C_tensor[min_idx:max_idx, :, :] 
-        distance_batch = distance_tensor[min_idx:max_idx, :, :]
-        tree_space = forward(C_batch)
-        loss = loss_function(tree_space, distance_batch, lengths[min_idx:max_idx])
-        loss.backward()
-        optimizer.step()
-    scheduler.step()
-    print(loss.item())
+def per_unit_acc(output, ground_truth, sentence_lengths):
+    output = torch.round(output)
+    labels_1s = (ground_truth != -1).float()
+    matching = ((labels_1s*ground_truth).view(-1) == ((labels_1s*output).view(-1)))
+    return torch.sum(matching) / float(len(matching))
 
-N_SENTENCES = data.test.phones_df['wav'].nunique()
-SENTENCE_MAX = data.test.phones_df.value_counts('wav').max()
-distance_matrix, C_matrix, lengths = generate_distance_and_c_matrix(data.test.phones_df, N_SENTENCES, SENTENCE_MAX)
-lengths = torch.from_numpy(lengths)
-C_tensor = torch.from_numpy(C_matrix).type(torch.float)
-distance_tensor = torch.from_numpy(distance_matrix).type(torch.float)
-tree_space = forward(C_tensor)
-tree_space = torch.round(tree_space)
-labels_1s = (distance_tensor != -1).float()
-matching = ((labels_1s*distance_tensor).view(-1) == ((labels_1s*tree_space).view(-1)))
-print(torch.sum(matching)/float(len(matching)))
-torch.save(B, "B.pt")
+class TreeProbe(nn.Module):
+    def __init__(self, n_dim=304, B_size=128, sentence_max=66):
+        super(TreeProbe, self).__init__()
+        self.sentence_max = sentence_max
+        self.B = nn.Linear(n_dim, B_size, dtype=torch.float, requires_grad=True)
+
+    def forward(self, x):
+        tree_space = self.B(C_batch)
+        tree_space = tree_space.unsqueeze(2).expand(-1, -1, SENTENCE_MAX, -1)
+        return torch.sum((tree_space - tree_space.transpose(1, 2)).pow(2), -1)
