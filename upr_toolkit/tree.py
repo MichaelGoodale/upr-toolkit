@@ -91,6 +91,6 @@ class TreeProbe(nn.Module):
         self.B = nn.Linear(n_dim, B_size)
 
     def forward(self, x):
-        tree_space = self.B(C_batch)
+        tree_space = self.B(x)
         tree_space = tree_space.unsqueeze(2).expand(-1, -1, self.sentence_max, -1)
         return torch.sum((tree_space - tree_space.transpose(1, 2)).pow(2), -1)
