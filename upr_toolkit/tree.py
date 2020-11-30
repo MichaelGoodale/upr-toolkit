@@ -57,17 +57,15 @@ def get_path_matrix(paths, sentence_max):
             mat[i-offset, j-offset] = paths[i][j]
     return mat
 
-def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max):
+def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, feature_dim=256, functions=[(np.mean, {"axis":1})]):
     distance_matrix = np.zeros((n_sentences, sentence_max, sentence_max))
-    C_matrix = np.zeros((n_sentences, sentence_max, 304))
+    C_matrix = np.zeros((n_sentences, sentence_max, feature_dim))
     len_matrix = []
     for i, (wav, sentence) in tqdm(enumerate(phones_df.groupby('wav')), total=n_sentences):
         _, paths = generate_tree(sentence)
         distance_matrix[i, :, :] = get_path_matrix(paths, sentence_max)
-        values = np.hstack([np.vstack([np.mean(x, axis=1) for x in sentence["c"].values]),
-                            np.vstack([np.var(x, axis=1) for x in sentence["c"].values]),
-                            np.vstack([np.median(x, axis=1) for x in sentence["c"].values]),
-                            np.vstack([x.shape[1] for x in sentence["c"].values])])
+        values = np.hstack([np.vstack([f(x, **kwargs) for x in sentence["c"].values])
+                            for f, kwargs in functions])
         C_matrix[i, :len(sentence), :] = values
         len_matrix.append(len(sentence))
     return distance_matrix, C_matrix, np.array(len_matrix)
@@ -86,7 +84,7 @@ def per_unit_acc(output, ground_truth, sentence_lengths):
     return torch.sum(matching) / float(len(matching))
 
 class TreeProbe(nn.Module):
-    def __init__(self, n_dim=304, B_size=128, sentence_max=66):
+    def __init__(self, n_dim=256, B_size=128, sentence_max=66):
         super(TreeProbe, self).__init__()
         self.sentence_max = sentence_max
         self.B = nn.Linear(n_dim, B_size, dtype=torch.float, requires_grad=True)
