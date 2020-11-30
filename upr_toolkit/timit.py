@@ -155,7 +155,6 @@ class TimitData:
             word_align_file='/home/michael/Documents/Cogmaster/M1/S1/stage/timit/wrdalign.timit',
             calculate_formants=True):
 
-        self.word_align_file = word_align_file
         if load_file is not None:
             self.phones_df = pd.read_feather(load_file)
             C = np.load(load_file + ".npy")
@@ -165,7 +164,7 @@ class TimitData:
                 raise Error("You must provide a function for get_C_function and C_time_function")
             self.TIMIT_DIR = timit_dir
 
-            lexical_info = TimitData.get_phone_data()
+            lexical_info = TimitData.get_phone_data(word_align_file)
             timit_files = self.get_timit_files(n=max_files)
 
             pool = multiprocessing.Pool(processes=n_proc)
@@ -254,9 +253,9 @@ class TimitData:
         df["wav"] = phones.replace('.phn', '.wav')
         return df
 
-    def get_phone_data():
+    def get_phone_data(word_align_file):
         datas = []
-        with open(self.word_align_file) as f:
+        with open(word_align_file) as f:
             for l in f:
                 if l[0] == '%':
                     continue
