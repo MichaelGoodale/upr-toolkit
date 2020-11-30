@@ -2,7 +2,6 @@ import os
 
 import torch
 import torchaudio
-from fairseq.models.wav2vec import Wav2VecModel
 
 from upr_toolkit.timit import TimitData
 
