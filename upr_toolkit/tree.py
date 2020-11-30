@@ -41,7 +41,10 @@ def generate_tree(sentence_df, do_syllables=True, include_nucleus=False, do_word
         multi_syllabic_words = sentence_df.loc[nuclei, :].groupby(consecutive_words).filter(lambda x: len(x) > 1).groupby('word')
         for word, group in multi_syllabic_words:
             for x in group.index:
-                    G.add_edge(centre[0], x)
+                centre = group[group["stress"] == "1"].index
+                if len(centre) == 0:
+                    centre = [group[group["stress"] == "0"].first_valid_index()]
+                G.add_edge(centre[0], x)
 
     paths = dict(nx.all_pairs_shortest_path_length(G))
     return G, paths
