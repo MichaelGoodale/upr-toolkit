@@ -278,11 +278,11 @@ class TimitData:
         return df
 
     @property
-    def get_number_of_sentences():
+    def get_number_of_sentences(self):
         return self.phones_df['wav'].nunique()
 
     @property
-    def get_largest_sentence():
+    def get_largest_sentence(self):
         return self.phones_df.value_counts('wav').max()
 
     
