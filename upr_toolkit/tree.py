@@ -6,7 +6,7 @@ from torch import nn
 
 from upr_toolkit.timit import TimitData
 
-def generate_tree(sentence_df, do_syllables=True, include_nucleus=False, do_words=True):
+def generate_tree(sentence_df, do_syllables=True, do_words=True):
     G = nx.Graph()
 
     syllable_groups = []
@@ -31,8 +31,6 @@ def generate_tree(sentence_df, do_syllables=True, include_nucleus=False, do_word
             nucleus = y.index[0]
             nuclei.append(nucleus)
             for phone in syllable_group:
-                if not include_nucleus and phone == nucleus:
-                    continue
                 if do_syllables:
                     G.add_edge(nucleus, phone)
 
@@ -57,12 +55,12 @@ def get_path_tensor(paths, sentence_max):
             mat[i-offset, j-offset] = paths[i][j]
     return mat
 
-def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, feature_dim=256, functions=[(torch.mean, {"dim":1})]):
+def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, feature_dim=256, functions=[(torch.mean, {"dim":1})], do_words=True, do_syllables=True):
     distance_tensor = torch.zeros((n_sentences, sentence_max, sentence_max))
     C_tensor = torch.zeros((n_sentences, sentence_max, feature_dim))
     len_tensor = []
     for i, (wav, sentence) in tqdm(enumerate(phones_df.groupby('wav')), total=n_sentences):
-        _, paths = generate_tree(sentence)
+        _, paths = generate_tree(sentence, do_syllables, do_words)
         distance_tensor[i, :, :] = get_path_tensor(paths, sentence_max)
         c_values = [torch.from_numpy(x) for x in sentence["c"].values]
         values = torch.hstack([torch.vstack([f(x, **kwargs) for x in c_values])
