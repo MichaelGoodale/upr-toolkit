@@ -8,7 +8,7 @@ class RandomData(ModelData):
         return int(ratio*time)
 
     def calculate_c(self, filename):
-        result = subprocess.run(['soxi', '-s', filename], capture_output=True)
+        result = subprocess.run(['soxi', '-s', filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
             raise ChildProcessError("Command soxi failed with errorcode {}, and stderr: {}".format(result.returncode, result.stderr))
         number_of_samples = int(result.stdout)
