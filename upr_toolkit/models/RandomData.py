@@ -9,6 +9,8 @@ class RandomData(ModelData):
 
     def calculate_c(self, filename):
         result = subprocess.run(['soxi', '-s', filename], capture_output=True)
+        if result.returncode != 0:
+            raise ChildProcessError("Command soxi failed with errorcode {}, and stderr: {}".format(result.returncode, result.stderr))
         number_of_samples = int(result.stdout)
         return np.random.uniform(size=(1, self.d, self.get_in_c_time(number_of_samples) + 1))
 

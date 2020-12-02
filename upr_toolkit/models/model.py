@@ -6,7 +6,6 @@ import torchaudio
 from upr_toolkit.timit import TimitData
 
 
-TIMIT_DIR='/home/michael/Documents/Cogmaster/M1/S1/stage/timit/TIMIT'
 
 class ModelData:
     def get_in_c_time(self, time):
@@ -15,11 +14,12 @@ class ModelData:
     def calculate_c(self, filename):
         raise NotImplementedError("calculate_c must be defined in a subclass")
 
-    def __init__(self, cache_file, max_files=None, **kwargs):
+    def __init__(self, cache_file, max_files=None, timit_dir='/home/michael/Documents/Cogmaster/M1/S1/stage/timit/TIMIT',
+            **kwargs):
         if cache_file is None or not os.path.exists(cache_file):
             timit = TimitData(self.calculate_c,
                     self.get_in_c_time,
-                    timit_dir='{}/train/'.format(TIMIT_DIR),
+                    timit_dir='{}/train/'.format(timit_dir),
                     max_files=max_files,
                     dropna=True,
                     save_file=cache_file,
@@ -35,7 +35,7 @@ class ModelData:
         if cache_file is None or not os.path.exists(test_file):
             timit_test = TimitData(self.calculate_c,
                     self.get_in_c_time,
-                    timit_dir='{}/test/'.format(TIMIT_DIR),
+                    timit_dir='{}/test/'.format(timit_dir),
                     max_files=max_files,
                     dropna=True,
                     save_file=test_file, 
