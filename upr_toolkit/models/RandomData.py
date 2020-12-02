@@ -15,4 +15,4 @@ class RandomData(ModelData):
     def __init__(self, d=256, seed=1337, max_files=None, **kwargs):
         self.d = d
         np.random.seed(seed)
-        super().__init__(None, max_files=max_files, multi_proc_c=True, calculate_formants=False, **kwargs)
+        super().__init__(cache_file=None, max_files=max_files, multi_proc_c=True, calculate_formants=False, **kwargs)
