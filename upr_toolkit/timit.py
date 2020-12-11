@@ -177,7 +177,7 @@ class TimitData:
                 for f in tqdm(timit_files):
                     C[f["wav"]] = get_C_function(f["wav"])
 
-            load_phone_args = [(f['phn'], lexical_info[lexical_info['file'] == self.get_lex_file(f)])
+            load_phone_args = [(f['phn'], lexical_info[lexical_info['file'] == self.get_lex_file(f)], C_time_function)
                 for f in timit_files]
 
             phones_df = pool.starmap(TimitData.get_phone_timing, load_phone_args)
@@ -186,8 +186,6 @@ class TimitData:
             pool.close()
 
             phones_df = pd.concat(phones_df)
-            phones_df["start_c"] = phones_df["start"].apply(C_time_function)
-            phones_df["end_c"] = phones_df["end"].apply(C_time_function)
 
             phones_df["c"] = phones_df.apply(lambda x: np.squeeze(C[x["wav"]][:, :, x["start_c"]:x["end_c"]], axis=0), axis=1)
             phones_df["c_lengths"] = phones_df["c"].apply(lambda x: x.shape[-1])
@@ -222,8 +220,10 @@ class TimitData:
                     return ret_list
         return ret_list
 
-    def get_formant_time(start, end):
-        return ((0.5*(end - start)) + start) /  16000
+    def get_formant_times(r):
+        n_samples = r['end_c'] - r['start_c']
+        duration = ( r['end'] - r['start'] ) / n_samples
+        return [(r['start'] + (duration * t)) /  16000  for t in range(n_samples)]
 
     def get_formants(phones):
         wav_file = phones.loc[0, "wav"]
@@ -231,12 +231,12 @@ class TimitData:
         formants = call(snd, "To Formant (burg)", 0.0025, 5, 5000, 0.025, 50)
         for i in range(1, 5):
             phones["f{}".format(i)] = phones.apply(lambda r: np.nan if r["phone"] not in TimitData.VOWELS
-                    else call(formants, "Get value at time", i,
-                              TimitData.get_formant_time(r['start'], r['end']), 'Hertz', 'Linear'),
+                    else np.array([call(formants, "Get value at time", i, t, 'Hertz', 'Linear') for t in
+                              TimitData.get_formant_times(r)]),
                     axis=1)
         return phones
 
-    def get_phone_timing(phones, df):
+    def get_phone_timing(phones, df, C_time_function):
         '''Given a .PHN file, parse the phones in it and preprocess them to find basic phonological attributes
         Returns a pandas dataframe'''
         phone_times = []
@@ -251,6 +251,8 @@ class TimitData:
                     phone_times.append([int(start), int(end), phone] + list(phone_row[["phoneme", "stress", "boundary", "word"]]))
         df = pd.DataFrame(phone_times, columns=["start", "end", "phone", "phoneme", "stress", "boundary", "word"])
         df["wav"] = phones.replace('.phn', '.wav')
+        df["start_c"] = df["start"].apply(C_time_function)
+        df["end_c"] = df["end"].apply(C_time_function)
         return df
 
     def get_phone_data(word_align_file):

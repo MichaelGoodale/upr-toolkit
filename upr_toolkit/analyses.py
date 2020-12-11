@@ -7,24 +7,33 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
-from timit import TimitData
-from models import Wav2VecData, CPCData, VQWav2VecData
+from upr_toolkit.timit import TimitData
+from upr_toolkit.models import Wav2VecData, CPCData, VQWav2VecData
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from sklearn import linear_model
 import torchaudio
 
 def get_formant_regression(train):
-    idx = train.phones_df["phone"].isin(TimitData.VOWELS)
-    phones = train.phones_df[idx]
-    X = np.vstack([np.mean(x, axis=2) for x in df["c"]])
-    f1_y = phones["f1"]
-    f2_y = phones["f2"]
+    X, f1_y, f2_y = get_formant_data(train)
     reg1 = linear_model.LinearRegression()
     reg1.fit(X, f1_y)
     reg2 = linear_model.LinearRegression()
     reg2.fit(X, f2_y)
     return reg1, reg2
+
+def get_formant_data(train):
+    idx = train.phones_df["phone"].isin(TimitData.VOWELS)
+    phones = train.phones_df[idx]
+    X = np.hstack(phones["c"]).T
+    f1_y = np.hstack(phones["f1"])
+    f2_y = np.hstack(phones["f2"])
+    return X, f1_y, f2_y
+
+def compare_formants(data):
+    reg1, reg2 = get_formant_regression(data.train)
+    X, f1_y, f2_y = get_formant_data(data.test)
+    return reg1.score(X, f1_y), reg2.score(X, f2_y)
 
 def display_reduction(train, category="phone", reducer=umap.UMAP(), min_sample=1000, display_sample=50):
     df = train.phones_df.groupby(category).filter(lambda x: len(x) > min_sample).groupby(category).sample(n=min_sample)
@@ -92,6 +101,3 @@ def spectrogram_and_encodings(train, wav='timit/TIMIT/train/dr4/msrg0/sa1.wav'):
             c_pos += c_offset
 
     plt.show()
-
-data = CPCData()
-conditional_probability_matrix(data.train, vq_column=1)
