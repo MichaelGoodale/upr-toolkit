@@ -20,7 +20,7 @@ class Wav2VecData(ModelData):
         return c
 
     def __init__(self, wav2vec_model='/home/michael/Documents/Cogmaster/M1/S1/stage/wav2vec_large.pt',
-            cache_file='/home/michael/Documents/Cogmaster/M1/S1/stage/model_caches/timitdata.ft',
+            cache_file='/home/michael/Documents/Cogmaster/M1/S1/stage/model_caches/wav2vec.ft',
             max_files=None, **kwargs):
 
         cp = torch.load(wav2vec_model, map_location=torch.device('cpu'))

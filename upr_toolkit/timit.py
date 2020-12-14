@@ -167,23 +167,22 @@ class TimitData:
             lexical_info = TimitData.get_phone_data(word_align_file)
             timit_files = self.get_timit_files(n=max_files)
 
-            pool = multiprocessing.Pool(processes=n_proc)
+            with multiprocessing.Pool(processes=n_proc) as pool:
+                if multi_proc_c:
+                    C = list(tqdm(pool.imap(get_C_function, [f["wav"] for f in timit_files]), total=len(timit_files)))
+                    C = {f["wav"]: v for f, v in zip(timit_files, C)}
+                else:
+                    C = {}
+                    for f in tqdm(timit_files):
+                        C[f["wav"]] = get_C_function(f["wav"])
 
-            if multi_proc_c:
-                C = list(tqdm(pool.imap(get_C_function, [f["wav"] for f in timit_files]), total=len(timit_files)))
-                C = {f["wav"]: v for f, v in zip(timit_files, C)}
-            else:
-                C = {}
-                for f in tqdm(timit_files):
-                    C[f["wav"]] = get_C_function(f["wav"])
+                load_phone_args = [(f['phn'], lexical_info[lexical_info['file'] == self.get_lex_file(f)], C_time_function)
+                    for f in timit_files]
 
-            load_phone_args = [(f['phn'], lexical_info[lexical_info['file'] == self.get_lex_file(f)], C_time_function)
-                for f in timit_files]
-
-            phones_df = pool.starmap(TimitData.get_phone_timing, load_phone_args)
-            if calculate_formants:
-                phones_df = list(tqdm(pool.imap(TimitData.get_formants, phones_df), total=len(timit_files)))
-            pool.close()
+                phones_df = pool.starmap(TimitData.get_phone_timing, load_phone_args)
+                if calculate_formants:
+                    phones_df = list(tqdm(pool.imap(TimitData.get_formants, phones_df), total=len(timit_files)))
+                pool.close()
 
             phones_df = pd.concat(phones_df)
 

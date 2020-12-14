@@ -12,13 +12,15 @@ from upr_toolkit.models import Wav2VecData, CPCData, VQWav2VecData
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from sklearn import linear_model
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 import torchaudio
 
-def get_formant_regression(train):
+def get_formant_regression(train, model=linear_model.LinearRegression):
     X, f1_y, f2_y = get_formant_data(train)
-    reg1 = linear_model.LinearRegression()
+    reg1 = model()
     reg1.fit(X, f1_y)
-    reg2 = linear_model.LinearRegression()
+    reg2 = model()
     reg2.fit(X, f2_y)
     return reg1, reg2
 
@@ -30,14 +32,38 @@ def get_formant_data(train):
     f2_y = np.hstack(phones["f2"])
     return X, f1_y, f2_y
 
-def compare_formants(data):
-    reg1, reg2 = get_formant_regression(data.train)
+def compare_formants(data, model=linear_model.LinearRegression):
+    reg1, reg2 = get_formant_regression(data.train, model=model)
     X, f1_y, f2_y = get_formant_data(data.test)
     return reg1.score(X, f1_y), reg2.score(X, f2_y)
 
+def get_boundary_y(train, classify="all"):
+    y = train.phones_df["boundary"].values.astype(int)
+    if classify == "word":
+        y[y == 3] = 2
+        y[y != 2] = 0
+        y[y == 2] = 1
+    elif classify == "syllable":
+        y[y == 2] = 1
+        y[y == 3] = 0
+    elif classify == "phrase":
+        y[y != 3] = 0
+        y[y == 3] = 1
+    return y
+
+def get_boundary_classifier(train, classify="all"):
+    y = get_boundary_y(train, classify)
+    X = get_X_mean(train.phones_df)
+    classifier = Pipeline(steps=[('scaler', StandardScaler()), ('logistic_regression', linear_model.LogisticRegression(max_iter=1000))])
+    classifier.fit(X, y)
+    return classifier
+
+def get_X_mean(df):
+    return np.vstack([np.mean(x, axis=1) for x in df["c"]])
+
 def display_reduction(train, category="phone", reducer=umap.UMAP(), min_sample=1000, display_sample=50):
     df = train.phones_df.groupby(category).filter(lambda x: len(x) > min_sample).groupby(category).sample(n=min_sample)
-    X = np.vstack([np.mean(x, axis=2) for x in df["c"]])
+    X = get_X_mean(df)
     y = df.groupby(category).sample(n=display_sample)[category]
     reducer = reducer.fit(X)
     embedding = reducer.transform(np.vstack(df["c"][y.index]))

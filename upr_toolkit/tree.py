@@ -6,7 +6,7 @@ from torch import nn
 
 from upr_toolkit.timit import TimitData
 
-def generate_tree(sentence_df, do_syllables=True, do_words=True):
+def generate_tree(sentence_df, do_syllables=True, do_words=True, do_phrase=True):
     G = nx.Graph()
 
     syllable_groups = []
@@ -38,12 +38,13 @@ def generate_tree(sentence_df, do_syllables=True, do_words=True):
         consecutive_words = [(sentence_df['word'] != sentence_df["word"].shift()).cumsum()]
         multi_syllabic_words = sentence_df.loc[nuclei, :].groupby(consecutive_words).filter(lambda x: len(x) > 1).groupby('word')
         for word, group in multi_syllabic_words:
+            centre = group[group["stress"] == "1"].index
+            if len(centre) == 0:
+                centre = [group[group["stress"] == "0"].first_valid_index()]
+            if do_phrase:
+                G.add_edge(centre[0], sentence_df.index[0])
             for x in group.index:
-                centre = group[group["stress"] == "1"].index
-                if len(centre) == 0:
-                    centre = [group[group["stress"] == "0"].first_valid_index()]
                 G.add_edge(centre[0], x)
-
     paths = dict(nx.all_pairs_shortest_path_length(G))
     return G, paths
 
@@ -55,7 +56,8 @@ def get_path_tensor(paths, sentence_max):
             mat[i-offset, j-offset] = paths[i][j]
     return mat
 
-def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, feature_dim=256, functions=[(torch.mean, {"dim":1})], do_words=True, do_syllables=True):
+def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, functions=[(torch.mean, {"dim":1})], do_words=True, do_syllables=True):
+    feature_dim = len(functions) * phones_df["c"].values[0].shape[0]
     distance_tensor = torch.zeros((n_sentences, sentence_max, sentence_max))
     C_tensor = torch.zeros((n_sentences, sentence_max, feature_dim))
     len_tensor = []
@@ -76,11 +78,11 @@ def tree_loss(output, true_output, sentence_lengths):
     loss = torch.sum(loss) / torch.tensor(len(sentence_lengths))
     return loss
 
-def per_unit_acc(output, ground_truth, sentence_lengths):
+def per_unit_acc(output, ground_truth, sentence_lengths, sentence_max=66):
     output = torch.round(output)
     labels_1s = (ground_truth != -1).float()
-    matching = ((labels_1s*ground_truth).view(-1) == ((labels_1s*output).view(-1)))
-    return torch.sum(matching) / float(len(matching))
+    matching = torch.sum((labels_1s*ground_truth) == (labels_1s*output), dim=[1,2]) - (sentence_max ** 2 - torch.pow(sentence_lengths, 2))
+    return torch.sum(matching) / torch.sum(torch.pow(sentence_lengths, 2))
 
 class TreeProbe(nn.Module):
     def __init__(self, n_dim=256, B_size=128, sentence_max=66):
