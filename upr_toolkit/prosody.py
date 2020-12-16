@@ -164,17 +164,17 @@ def train_model_on_prosody(generate=True):
 
         y = torch.tensor([[y_map["<sos>"]]+[y_map[s] for s in sentence]+[4]*(y_pad-len(sentence)) for sentence in y])
 
-        test_X, test_y = get_sentence_tensor(data.train)
+        test_X, test_y = get_sentence_tensor(data.test)
         test_y = torch.tensor([[y_map["<sos>"]]+[y_map[s] for s in sentence]+[4]*(y_pad-len(sentence)) for sentence in test_y])
         torch.save(X, "X.pt")
         torch.save(y, "y.pt")
         torch.save(test_X, "test_X.pt")
         torch.save(test_y, "test_y.pt")
     else:
-        X = torch.load(X, "X.pt")
-        y = torch.load(y, "y.pt")
-        test_X = torch.load(test_X, "test_X.pt")
-        test_y = torch.load(test_y, "test_y.pt")
+        X = torch.load("X.pt")
+        y = torch.load("y.pt")
+        test_X = torch.load("test_X.pt")
+        test_y = torch.load("test_y.pt")
 
 
 
