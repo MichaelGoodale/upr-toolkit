@@ -175,6 +175,11 @@ def train_model_on_prosody(generate=True):
         y = torch.load("y.pt")
         test_X = torch.load("test_X.pt")
         test_y = torch.load("test_y.pt")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    X = X.to(device)
+    test_X = test_X.to(device)
+    y = y.to(device)
+    test_y = test_y.to(device)
 
 
 
@@ -196,8 +201,8 @@ def train_model_on_prosody(generate=True):
 
     enc = Encoder(input_dim, HID_DIM, N_LAYERS, DROPOUT)
     dec = Decoder(OUTPUT_DIM, HID_DIM, N_LAYERS, DROPOUT)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = Seq2Seq(enc, dec, device).to(device)
+
             
     model.apply(init_weights)
 
