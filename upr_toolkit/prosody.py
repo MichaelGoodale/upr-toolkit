@@ -93,66 +93,9 @@ class Seq2Seq(nn.Module):
         
         return outputs
 
-
-
-params = {'batch_size': 16,
-          'shuffle': True,
-          'num_workers': 6}
-generate = True
-
-y_map = {"0":0, "1":1, "2":2, "-": 3, "<pad>": 4, "<sos>": 5}
-
-if generate: 
-    data = ModelData(cache_file="/home/michael/Documents/Cogmaster/M1/S1/stage/model_caches/cpc_eng_data.ft")
-    X, y = get_sentence_tensor(data.train)
-
-    y_pad = max(len(s) for s in y)
-
-    y = torch.tensor([[y_map["<sos>"]]+[y_map[s] for s in sentence]+[4]*(y_pad-len(sentence)) for sentence in y])
-
-    test_X, test_y = get_sentence_tensor(data.train)
-    test_y = torch.tensor([[y_map["<sos>"]]+[y_map[s] for s in sentence]+[4]*(y_pad-len(sentence)) for sentence in test_y])
-    torch.save(X, "X.pt")
-    torch.save(y, "y.pt")
-    torch.save(test_X, "test_X.pt")
-    torch.save(test_y, "test_y.pt")
-else:
-    X = torch.load(X, "X.pt")
-    y = torch.load(y, "y.pt")
-    test_X = torch.load(test_X, "test_X.pt")
-    test_y = torch.load(test_y, "test_y.pt")
-
-
-
-input_dim = X.shape[-1]
-
-val_idx = int(0.95*X.shape[1])
-training_dataset = TensorDataset(X[:val_idx, :, :], y[:val_idx])
-training_generator = DataLoader(training_dataset, **params)
-val_dataset = TensorDataset(X[val_idx:, :, :], y[val_idx:])
-val_generator = DataLoader(val_dataset, **params)
-test_dataset = TensorDataset(test_X, test_y)
-test_generator = DataLoader(test_dataset, **params)
-
-
-OUTPUT_DIM = len(y_map) 
-HID_DIM = 512
-N_LAYERS = 2
-DROPOUT=0.5
-
-enc = Encoder(input_dim, HID_DIM, N_LAYERS, DROPOUT)
-dec = Decoder(OUTPUT_DIM, HID_DIM, N_LAYERS, DROPOUT)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Seq2Seq(enc, dec, device).to(device)
-
 def init_weights(m):
     for name, param in m.named_parameters():
         nn.init.uniform_(param.data, -0.08, 0.08)
-        
-model.apply(init_weights)
-
-optimizer = torch.optim.Adam(model.parameters())
-criterion = nn.CrossEntropyLoss(ignore_index=4)
 
 def epoch_time(start_time, end_time):
     elapsed_time = end_time - start_time
@@ -205,26 +148,82 @@ def evaluate(model, iterator, criterion):
         
     return epoch_loss / len(iterator)
 
-N_EPOCHS = 10
-CLIP = 1
-best_valid_loss = float('inf')
+
+def train_model_on_prosody(generate=True):
+    params = {'batch_size': 16,
+              'shuffle': True,
+              'num_workers': 6}
+
+    y_map = {"0":0, "1":1, "2":2, "-": 3, "<pad>": 4, "<sos>": 5}
+
+    if generate: 
+        data = ModelData(cache_file="/home/michael/Documents/Cogmaster/M1/S1/stage/model_caches/cpc_eng_data.ft")
+        X, y = get_sentence_tensor(data.train)
+
+        y_pad = max(len(s) for s in y)
+
+        y = torch.tensor([[y_map["<sos>"]]+[y_map[s] for s in sentence]+[4]*(y_pad-len(sentence)) for sentence in y])
+
+        test_X, test_y = get_sentence_tensor(data.train)
+        test_y = torch.tensor([[y_map["<sos>"]]+[y_map[s] for s in sentence]+[4]*(y_pad-len(sentence)) for sentence in test_y])
+        torch.save(X, "X.pt")
+        torch.save(y, "y.pt")
+        torch.save(test_X, "test_X.pt")
+        torch.save(test_y, "test_y.pt")
+    else:
+        X = torch.load(X, "X.pt")
+        y = torch.load(y, "y.pt")
+        test_X = torch.load(test_X, "test_X.pt")
+        test_y = torch.load(test_y, "test_y.pt")
 
 
-for epoch in range(N_EPOCHS):
-    
-    start_time = time.time()
-    
-    train_loss = train(model, training_generator, optimizer, criterion, CLIP, epoch, N_EPOCHS)
-    valid_loss = evaluate(model, val_generator, criterion)
-    
-    end_time = time.time()
-    
-    epoch_mins, epoch_secs = epoch_time(start_time, end_time)
-    
-    if valid_loss < best_valid_loss:
-        best_valid_loss = valid_loss
-        torch.save(model.state_dict(), 'tut1-model.pt')
-    
-    print(f'Epoch: {epoch+1:02} | Time: {epoch_mins}m {epoch_secs}s')
-    print(f'\tTrain Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}')
-    print(f'\t Val. Loss: {valid_loss:.3f} |  Val. PPL: {math.exp(valid_loss):7.3f}')
+
+    input_dim = X.shape[-1]
+
+    val_idx = int(0.95*X.shape[1])
+    training_dataset = TensorDataset(X[:val_idx, :, :], y[:val_idx])
+    training_generator = DataLoader(training_dataset, **params)
+    val_dataset = TensorDataset(X[val_idx:, :, :], y[val_idx:])
+    val_generator = DataLoader(val_dataset, **params)
+    test_dataset = TensorDataset(test_X, test_y)
+    test_generator = DataLoader(test_dataset, **params)
+
+
+    OUTPUT_DIM = len(y_map) 
+    HID_DIM = 512
+    N_LAYERS = 2
+    DROPOUT=0.5
+
+    enc = Encoder(input_dim, HID_DIM, N_LAYERS, DROPOUT)
+    dec = Decoder(OUTPUT_DIM, HID_DIM, N_LAYERS, DROPOUT)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = Seq2Seq(enc, dec, device).to(device)
+            
+    model.apply(init_weights)
+
+    optimizer = torch.optim.Adam(model.parameters())
+    criterion = nn.CrossEntropyLoss(ignore_index=4)
+
+    N_EPOCHS = 10
+    CLIP = 1
+    best_valid_loss = float('inf')
+
+
+    for epoch in range(N_EPOCHS):
+        
+        start_time = time.time()
+        
+        train_loss = train(model, training_generator, optimizer, criterion, CLIP, epoch, N_EPOCHS)
+        valid_loss = evaluate(model, val_generator, criterion)
+        
+        end_time = time.time()
+        
+        epoch_mins, epoch_secs = epoch_time(start_time, end_time)
+        
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            torch.save(model.state_dict(), 'tut1-model.pt')
+        
+        print(f'Epoch: {epoch+1:02} | Time: {epoch_mins}m {epoch_secs}s')
+        print(f'\tTrain Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}')
+        print(f'\t Val. Loss: {valid_loss:.3f} |  Val. PPL: {math.exp(valid_loss):7.3f}')
