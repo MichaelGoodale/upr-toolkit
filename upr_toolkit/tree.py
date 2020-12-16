@@ -56,7 +56,7 @@ def get_path_tensor(paths, sentence_max):
             mat[i-offset, j-offset] = paths[i][j]
     return mat
 
-def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, functions=[(torch.mean, {"dim":1})], do_words=True, do_syllables=True):
+def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, functions=[(torch.mean, {"dim":1}, 'mean')], do_words=True, do_syllables=True):
     feature_dim = len(functions) * phones_df["c"].values[0].shape[0]
     distance_tensor = torch.zeros((n_sentences, sentence_max, sentence_max))
     C_tensor = torch.zeros((n_sentences, sentence_max, feature_dim))
@@ -66,7 +66,7 @@ def generate_distance_and_c_matrix(phones_df, n_sentences, sentence_max, functio
         distance_tensor[i, :, :] = get_path_tensor(paths, sentence_max)
         c_values = [torch.from_numpy(x) for x in sentence["c"].values]
         values = torch.hstack([torch.vstack([f(x, **kwargs) for x in c_values])
-                            for f, kwargs in functions])
+                            for f, kwargs, _ in functions])
         C_tensor[i, :len(sentence), :] = values
         len_tensor.append(len(sentence))
     return C_tensor, distance_tensor, torch.tensor(len_tensor)

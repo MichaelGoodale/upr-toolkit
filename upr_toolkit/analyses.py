@@ -14,7 +14,24 @@ from sklearn.decomposition import PCA
 from sklearn import linear_model
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
 import torchaudio
+import torch
+
+
+def get_sentence_tensor(train, scale="sentence", y="prosody"):
+    '''Return (length, seq_length, c_dim), (length, stress)'''
+    c_list = [np.hstack(x) for _, x in train.phones_df.groupby('wav')["c"]]
+
+    pad_dim = max([x.shape[-1] for x in c_list])
+    input_dim = c_list[0].shape[0]
+    X = torch.zeros(len(c_list), pad_dim, input_dim)
+    for i, c in enumerate(c_list):
+        X[i, :c.shape[-1], :] = torch.from_numpy(c.T)
+
+    y = [list(x["stress"]) for _, x in train.phones_df.groupby('wav')]
+    return X, y
+
 
 def get_formant_regression(train, model=linear_model.LinearRegression):
     X, f1_y, f2_y = get_formant_data(train)
@@ -54,6 +71,19 @@ def get_boundary_y(train, classify="all"):
 def get_boundary_classifier(train, classify="all"):
     y = get_boundary_y(train, classify)
     X = get_X_mean(train.phones_df)
+    classifier = Pipeline(steps=[('scaler', StandardScaler()), ('logistic_regression', linear_model.LogisticRegression(max_iter=1000))])
+    classifier.fit(X, y)
+    return classifier
+
+def get_stress_y(train, classify="both"):
+    y = train.phones_df.loc[train.phones_df["stress"] != '-', 'stress'].values.astype(int)
+    if classify == "primary":
+        y[y == 2] = 0
+    return y
+
+def get_stress_classifier(train, classify="both"):
+    y = get_stress_y(train, classify)
+    X = get_X_mean(train.phones_df[train.phones_df["stress"] != '-'])
     classifier = Pipeline(steps=[('scaler', StandardScaler()), ('logistic_regression', linear_model.LogisticRegression(max_iter=1000))])
     classifier.fit(X, y)
     return classifier
