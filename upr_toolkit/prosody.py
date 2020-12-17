@@ -158,7 +158,7 @@ def train_model_on_prosody(batch_size=16, hidden_dim=128, n_layers=3, n_epochs=1
 
     y_map = {"0":0, "1":1, "2":2, "-": 3, "<pad>": 4, "<sos>": 5}
 
-    if generate: 
+    if generate_data: 
         data = ModelData(cache_file="/home/michael/Documents/Cogmaster/M1/S1/stage/model_caches/cpc_eng_data.ft")
         X, y = get_sentence_tensor(data.train)
 
