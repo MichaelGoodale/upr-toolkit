@@ -125,11 +125,10 @@ def train(model, iterator, optimizer, criterion, clip, epoch_num, total_epochs, 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
-        print(loss.item())
         epoch_loss += loss.item()
     return epoch_loss / len(iterator)
 
-def evaluate(model, iterator, criterion):
+def evaluate(model, iterator, criterion, device):
     
     model.eval()
     
