@@ -1,5 +1,6 @@
 import time
 import random
+import math
 
 import torch
 import torch.nn as nn
@@ -55,7 +56,6 @@ class Seq2Seq(nn.Module):
             "Encoder and decoder must have equal number of layers!"
         
     def forward(self, src, trg, teacher_forcing_ratio = 0.5):
-        
         #src = [src len, batch size]
         #trg = [trg len, batch size]
         #teacher_forcing_ratio is probability to use teacher forcing
@@ -103,16 +103,17 @@ def epoch_time(start_time, end_time):
     elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
     return elapsed_mins, elapsed_secs
 
-def train(model, iterator, optimizer, criterion, clip, epoch_num, total_epochs):
+def train(model, iterator, optimizer, criterion, clip, epoch_num, total_epochs, device):
     
     model.train()
     
     epoch_loss = 0
     
-    for i, (src, trg) in tqdm(enumerate(iterator), desc=f"Training epoch {epoch_num}/{total_epochs}", total=len(iterator.dataset)):
+    for i, (src, trg) in tqdm(enumerate(iterator), desc=f"Training epoch {epoch_num+1}/{total_epochs}", total=len(iterator.dataset)):
         
         optimizer.zero_grad()
-        
+        src = src.to(device)
+        trg = trg.to(device)
         output = model(src, trg)
         output_dim = output.shape[-1]
 
@@ -137,7 +138,8 @@ def evaluate(model, iterator, criterion):
     with torch.no_grad():
     
         for i, (src, trg) in enumerate(iterator):
-
+            src = src.to(device)
+            trg = trg.to(device)
             output = model(src, trg, 0) #turn off teacher forcing
             output_dim = output.shape[-1]
             output = output[:, 1:, :].reshape(-1, output_dim)
@@ -149,7 +151,7 @@ def evaluate(model, iterator, criterion):
     return epoch_loss / len(iterator)
 
 
-def train_model_on_prosody(generate=True):
+def train_model_on_prosody(batch_size=16, hidden_dim=128, n_layers=3, n_epochs=10, generate_data=True):
     params = {'batch_size': 16,
               'shuffle': True,
               'num_workers': 6}
@@ -176,13 +178,6 @@ def train_model_on_prosody(generate=True):
         test_X = torch.load("test_X.pt")
         test_y = torch.load("test_y.pt")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    X = X.to(device)
-    test_X = test_X.to(device)
-    y = y.to(device)
-    test_y = test_y.to(device)
-
-
-
     input_dim = X.shape[-1]
 
     val_idx = int(0.95*X.shape[1])
@@ -195,12 +190,10 @@ def train_model_on_prosody(generate=True):
 
 
     OUTPUT_DIM = len(y_map) 
-    HID_DIM = 512
-    N_LAYERS = 2
-    DROPOUT=0.5
+    DROPOUT = 0.1
 
-    enc = Encoder(input_dim, HID_DIM, N_LAYERS, DROPOUT)
-    dec = Decoder(OUTPUT_DIM, HID_DIM, N_LAYERS, DROPOUT)
+    enc = Encoder(input_dim, hidden_dim, n_layers, DROPOUT)
+    dec = Decoder(OUTPUT_DIM, hidden_dim, n_layers, DROPOUT)
     model = Seq2Seq(enc, dec, device).to(device)
 
             
@@ -209,17 +202,16 @@ def train_model_on_prosody(generate=True):
     optimizer = torch.optim.Adam(model.parameters())
     criterion = nn.CrossEntropyLoss(ignore_index=4)
 
-    N_EPOCHS = 10
     CLIP = 1
     best_valid_loss = float('inf')
 
 
-    for epoch in range(N_EPOCHS):
+    for epoch in range(n_epochs):
         
         start_time = time.time()
         
-        train_loss = train(model, training_generator, optimizer, criterion, CLIP, epoch, N_EPOCHS)
-        valid_loss = evaluate(model, val_generator, criterion)
+        train_loss = train(model, training_generator, optimizer, criterion, CLIP, epoch, n_epochs, device)
+        valid_loss = evaluate(model, val_generator, criterion, device)
         
         end_time = time.time()
         
